@@ -29,25 +29,38 @@ const getBaseUrl = () => {
 export const testBackendConnection = async (): Promise<boolean> => {
   try {
     const baseUrl = getBaseUrl();
-    console.log('🏥 Testing backend connection to:', `${baseUrl}/api`);
+    const healthUrl = `${baseUrl}/api`;
+    console.log('🏥 Testing backend connection to:', healthUrl);
     
-    const response = await fetch(`${baseUrl}/api`, {
+    const response = await fetch(healthUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
       },
+      // Add timeout to prevent hanging (if supported)
+      ...(typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? 
+        { signal: AbortSignal.timeout(10000) } : {})
     });
+    
+    console.log('🏥 Health check response:', response.status, response.statusText);
     
     if (response.ok) {
       const data = await response.json();
       console.log('✅ Backend health check passed:', data);
       return true;
     } else {
-      console.error('❌ Backend health check failed:', response.status, response.statusText);
+      console.error('❌ Backend health check failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: healthUrl
+      });
       return false;
     }
   } catch (error) {
-    console.error('❌ Backend connection test failed:', error);
+    console.error('❌ Backend connection test failed:', {
+      error: error instanceof Error ? error.message : error,
+      baseUrl: getBaseUrl()
+    });
     return false;
   }
 };
@@ -63,16 +76,12 @@ export const trpcClient = trpc.createClient({
       url: `${getBaseUrl()}/api/trpc`,
       transformer: superjson,
       fetch: async (url, options) => {
-        console.log('🔗 tRPC request:', url);
-        
-        // Test backend connection first if this is the first request
-        const urlString = typeof url === 'string' ? url : url.toString();
-        if (!urlString.includes('health-checked')) {
-          const isHealthy = await testBackendConnection();
-          if (!isHealthy) {
-            throw new Error('Backend server is not responding. Please check if the server is running.');
-          }
-        }
+        console.log('🔗 tRPC request to:', url);
+        console.log('🔗 Request options:', {
+          method: options?.method,
+          headers: options?.headers,
+          body: options?.body ? 'present' : 'none'
+        });
         
         try {
           const response = await fetch(url, {
@@ -84,16 +93,27 @@ export const trpcClient = trpc.createClient({
             },
           });
           
+          console.log('📡 Response status:', response.status, response.statusText);
+          
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('❌ tRPC response error:', response.status, response.statusText, errorText);
+            console.error('❌ tRPC response error:', {
+              status: response.status,
+              statusText: response.statusText,
+              errorText,
+              url: url.toString()
+            });
             throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
           }
           
-          console.log('✅ tRPC response success:', response.status);
+          console.log('✅ tRPC response success');
           return response;
         } catch (error) {
-          console.error('❌ tRPC fetch error:', error);
+          console.error('❌ tRPC fetch error:', {
+            error: error instanceof Error ? error.message : error,
+            url: url.toString(),
+            stack: error instanceof Error ? error.stack : undefined
+          });
           
           // Provide more helpful error messages
           if (error instanceof TypeError && error.message.includes('fetch')) {

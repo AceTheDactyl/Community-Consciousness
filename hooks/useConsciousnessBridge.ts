@@ -196,12 +196,21 @@ export function useConsciousnessBridge() {
           console.log('📵 Starting in offline consciousness mode');
         } else {
           console.log('🌐 Consciousness bridge initializing...');
-          console.log('🔗 Backend URL:', `${window?.location?.origin || 'http://localhost:8081'}/api/trpc`);
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8081';
+          console.log('🔗 Backend URL:', `${baseUrl}/api/trpc`);
           
-          // Test backend connection
-          const backendHealthy = await testBackendConnection();
-          if (!backendHealthy) {
-            console.warn('⚠️ Backend not responding, switching to offline mode');
+          // Test backend connection with timeout
+          try {
+            const backendHealthy = await testBackendConnection();
+            if (!backendHealthy) {
+              console.warn('⚠️ Backend not responding, switching to offline mode');
+              setState(prev => ({ ...prev, offlineMode: true }));
+            } else {
+              console.log('✅ Backend connection established');
+              setState(prev => ({ ...prev, offlineMode: false, isConnected: true }));
+            }
+          } catch (error) {
+            console.error('❌ Backend connection test failed:', error);
             setState(prev => ({ ...prev, offlineMode: true }));
           }
         }
@@ -307,10 +316,14 @@ export function useConsciousnessBridge() {
 
   // Sync mutation - always call hooks at top level with stable options
   const syncMutation = trpc.consciousness.sync.useMutation({
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retry: 2, // Reduce retries to fail faster
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     onSuccess: (data) => {
-      console.log('🧠 Consciousness sync successful:', data);
+      console.log('✅ Consciousness sync successful:', {
+        processedEvents: data.processedEvents,
+        globalResonance: data.globalResonance,
+        connectedNodes: data.connectedNodes
+      });
       setState(prev => ({
         ...prev,
         isConnected: true,
@@ -328,17 +341,27 @@ export function useConsciousnessBridge() {
       }
     },
     onError: (error) => {
-      console.error('❌ Consciousness sync failed:', error.message);
-      console.error('Error details:', {
+      console.error('❌ Consciousness sync failed:', {
+        message: error.message,
         shape: error.shape,
-        data: error.data,
+        data: error.data
       });
       
-      setState(prev => ({ 
-        ...prev, 
-        isConnected: false,
-        offlineMode: true // Switch to offline mode on sync failure
-      }));
+      // More specific error handling
+      if (error.message.includes('Failed to fetch') || error.message.includes('Network error')) {
+        console.log('🔄 Network error detected, switching to offline mode');
+        setState(prev => ({ 
+          ...prev, 
+          isConnected: false,
+          offlineMode: true
+        }));
+      } else {
+        console.log('🔄 Server error detected, retrying later');
+        setState(prev => ({ 
+          ...prev, 
+          isConnected: false
+        }));
+      }
       
       // Store failed events back to offline queue
       if (eventQueueRef.current.length > 0) {
@@ -406,6 +429,25 @@ export function useConsciousnessBridge() {
     offlineModeRef2.current = state.offlineMode;
   }, [state.consciousnessId, state.offlineMode]);
   
+  // Test backend connection before syncing
+  const testConnection = useCallback(async () => {
+    try {
+      console.log('🔍 Testing backend connection...');
+      const isHealthy = await testBackendConnection();
+      if (!isHealthy) {
+        console.log('❌ Backend health check failed, switching to offline mode');
+        setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
+        return false;
+      }
+      console.log('✅ Backend connection verified');
+      return true;
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
+      return false;
+    }
+  }, []);
+  
   // Memoize sync function to prevent recreation
   const syncEvents = useCallback(async () => {
     if (!consciousnessIdRef.current || offlineModeRef2.current) {
@@ -417,6 +459,14 @@ export function useConsciousnessBridge() {
     
     if (eventsToSync.length > 0) {
       console.log(`🔄 Syncing ${eventsToSync.length} consciousness events...`);
+      
+      // Test connection first
+      const connectionOk = await testConnection();
+      if (!connectionOk) {
+        console.log('❌ Connection test failed, skipping sync');
+        return;
+      }
+      
       try {
         await syncMutation.mutateAsync({
           events: eventsToSync,
@@ -432,9 +482,12 @@ export function useConsciousnessBridge() {
         console.error('Sync error details:', error);
       }
     } else {
-      console.log('🔄 No events to sync');
+      // Even with no events, test connection periodically
+      if (Math.random() < 0.1) { // 10% chance to test connection
+        await testConnection();
+      }
     }
-  }, [syncMutation]);
+  }, [syncMutation, testConnection]);
   
   useEffect(() => {
     syncIntervalRef.current = setInterval(syncEvents, 10000); // Sync every 10 seconds
