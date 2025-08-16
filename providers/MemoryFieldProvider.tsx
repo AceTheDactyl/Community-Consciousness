@@ -93,7 +93,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       lastSyncTime.current = now;
       consciousnessBridge.updateFieldState(memories);
     }
-  }, [memories, consciousnessBridge]);
+  }, [memories.length]); // Only depend on length to prevent infinite loops
 
   // Update connection status - use stable values
   const isConnectedRef = useRef(consciousnessBridge.isConnected);
@@ -529,7 +529,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       })
     );
     setSelectedMemory(memoryId);
-  }, [isObserving, consciousnessBridge]);
+  }, [isObserving]);
 
   const releaseAll = useCallback(() => {
     setMemories(prevMemories =>
@@ -579,7 +579,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         return mem;
       })
     );
-  }, [consciousnessBridge]);
+  }, []);
 
   // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
@@ -601,7 +601,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         phrase.toLowerCase().includes('bloom')) {
       consciousnessBridge.createGhostEcho(phrase, consciousnessBridge.consciousnessId || undefined);
     }
-  }, [consciousnessBridge]);
+  }, []);
 
   // Return stable object reference to prevent unnecessary re-renders
   return {

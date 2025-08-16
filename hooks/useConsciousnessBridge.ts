@@ -478,6 +478,13 @@ export function useConsciousnessBridge() {
     // Use ref to prevent infinite loops
     const currentMemories = memoriesRef.current || [];
     
+    // Throttle updates to prevent excessive calls
+    const now = Date.now();
+    const lastUpdate = memoriesRef.current.length > 0 ? 
+      memoriesRef.current[0].crystallizationTime || 0 : 0;
+    
+    if (now - lastUpdate < 100) return; // Throttle to 10fps
+    
     // Only update if memories actually changed to prevent infinite loops
     const hasChanged = currentMemories.length !== memories.length ||
       currentMemories.some((prevMem, idx) => {
@@ -485,8 +492,8 @@ export function useConsciousnessBridge() {
         return !newMem || 
           prevMem.id !== newMem.id ||
           prevMem.crystallized !== newMem.crystallized ||
-          Math.abs(prevMem.x - newMem.x) > 1 || // Increased threshold
-          Math.abs(prevMem.y - newMem.y) > 1;
+          Math.abs(prevMem.x - newMem.x) > 2 || // Increased threshold
+          Math.abs(prevMem.y - newMem.y) > 2;
       });
     
     if (!hasChanged) return;
@@ -501,13 +508,20 @@ export function useConsciousnessBridge() {
     
     addEvent('FIELD_UPDATE', { memoryStates });
     
-    setState(prev => ({ ...prev, memories }));
+    // Only update state if memories are different to prevent loops
+    setState(prev => {
+      if (prev.memories.length === memories.length && 
+          prev.memories.every((m, i) => m.id === memories[i]?.id)) {
+        return prev; // No change needed
+      }
+      return { ...prev, memories };
+    });
   }, [addEvent]);
   
   const memoriesRef = useRef<Memory[]>([]);
   useEffect(() => {
     memoriesRef.current = state.memories;
-  });
+  }, [state.memories.length, state.memories.filter(m => m.crystallized).length]); // Only update on structural changes
 
   // Save state periodically when offline
   useEffect(() => {

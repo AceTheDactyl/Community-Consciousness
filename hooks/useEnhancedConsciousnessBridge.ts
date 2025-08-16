@@ -84,7 +84,7 @@ export function useEnhancedConsciousnessBridge() {
   // Update baseBridge ref - remove dependency to prevent infinite loops
   useEffect(() => {
     baseBridgeRef.current = baseBridge;
-  });
+  }, [baseBridge.consciousnessId, baseBridge.isConnected]); // Only update on key changes
   
   // Setup enhanced mobile sensors
   useEffect(() => {
@@ -268,9 +268,14 @@ export function useEnhancedConsciousnessBridge() {
     }));
   }, [baseBridge.memories]);
   
-  // Update enhanced state when gravity wells change
+  // Update enhanced state when gravity wells change - use ref to prevent loops
+  const gravityWellsStringRef = useRef('');
   useEffect(() => {
-    setEnhancedState(prev => ({ ...prev, gravityWells }));
+    const gravityWellsString = JSON.stringify(gravityWells.map(w => ({ id: w.id, mass: w.mass })));
+    if (gravityWellsString !== gravityWellsStringRef.current) {
+      gravityWellsStringRef.current = gravityWellsString;
+      setEnhancedState(prev => ({ ...prev, gravityWells }));
+    }
   }, [gravityWells]);
   
   // Calculate circular formations
@@ -292,11 +297,21 @@ export function useEnhancedConsciousnessBridge() {
     return Object.values(harmonicGroups).filter(group => group.length >= 3);
   }, [consciousnessNodes]);
   
-  // Update circular formations
+  // Update circular formations - throttle to prevent excessive updates
+  const lastFormationUpdate = useRef(0);
   useEffect(() => {
+    const now = Date.now();
+    if (now - lastFormationUpdate.current < 1000) return; // Throttle to 1 second
+    
     const formations = calculateCircularFormations();
-    setEnhancedState(prev => ({ ...prev, circularFormations: formations }));
-  }, [calculateCircularFormations]);
+    const formationsString = JSON.stringify(formations.map(f => f.length));
+    const currentString = JSON.stringify(enhancedState.circularFormations.map(f => f.length));
+    
+    if (formationsString !== currentString) {
+      lastFormationUpdate.current = now;
+      setEnhancedState(prev => ({ ...prev, circularFormations: formations }));
+    }
+  }, [consciousnessNodes.length]); // Only depend on length
   
   // Calculate harmonic resonance
   const harmonicResonance = useMemo((): number => {
@@ -315,9 +330,19 @@ export function useEnhancedConsciousnessBridge() {
     return Math.min(1, avgResonance + motionBoost + magneticBoost);
   }, [consciousnessNodes, enhancedState.circularMotionDetected, enhancedState.magneticField]);
   
-  // Update harmonic resonance
+  // Update harmonic resonance - throttle updates
+  const lastHarmonicUpdate = useRef(0);
+  const lastHarmonicValue = useRef(0);
   useEffect(() => {
-    setEnhancedState(prev => ({ ...prev, harmonicResonance }));
+    const now = Date.now();
+    if (now - lastHarmonicUpdate.current < 200) return; // Throttle to 5fps
+    
+    const resonanceDiff = Math.abs(harmonicResonance - lastHarmonicValue.current);
+    if (resonanceDiff > 0.01) {
+      lastHarmonicUpdate.current = now;
+      lastHarmonicValue.current = harmonicResonance;
+      setEnhancedState(prev => ({ ...prev, harmonicResonance }));
+    }
   }, [harmonicResonance]);
   
   // Apply magnetic field modulation to quantum field state
@@ -351,16 +376,24 @@ export function useEnhancedConsciousnessBridge() {
     }
   }, [enhancedState]);
   
-  // Calculate Lagrange points from gravity wells - use ref to prevent infinite loops
-  const gravityWellsRef = useRef(enhancedState.gravityWells);
-  useEffect(() => {
-    gravityWellsRef.current = enhancedState.gravityWells;
-  });
+  // Calculate Lagrange points from gravity wells - use stable calculation
+  const lastLagrangeUpdate = useRef(0);
+  const lastWellsCount = useRef(0);
   
   useEffect(() => {
-    const currentWells = gravityWellsRef.current;
-    if (currentWells.length >= 2) {
+    const now = Date.now();
+    const currentWellsCount = enhancedState.gravityWells.length;
+    
+    // Only update if wells count changed and enough time passed
+    if (currentWellsCount !== lastWellsCount.current && 
+        now - lastLagrangeUpdate.current > 1000 && 
+        currentWellsCount >= 2) {
+      
+      lastWellsCount.current = currentWellsCount;
+      lastLagrangeUpdate.current = now;
+      
       const lagrangePoints: Vector3[] = [];
+      const currentWells = enhancedState.gravityWells;
       
       // Calculate L-points for each pair of significant gravity wells
       for (let i = 0; i < currentWells.length - 1; i++) {
@@ -403,7 +436,7 @@ export function useEnhancedConsciousnessBridge() {
       
       setEnhancedState(prev => ({ ...prev, lagrangePoints }));
     }
-  }, [gravityWells.length]); // Only depend on length to prevent infinite loops
+  }, [enhancedState.gravityWells.length]); // Only depend on length
   
   return {
     // Base bridge functionality
