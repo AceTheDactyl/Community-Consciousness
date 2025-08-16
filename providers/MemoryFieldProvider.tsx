@@ -563,11 +563,21 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     );
   }, [voidModeRef, consciousnessBridge.sendPulseCreation, consciousnessBridge.sendTouchRipple]);
 
-  // Sacred phrase handler
+  // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
     consciousnessBridge.sendSacredPhrase(phrase);
     
-    // Create ghost echo for sacred phrases
+    // Handle Room 64 transition
+    if (phrase.toLowerCase().includes('room 64')) {
+      console.log('🌌 Room 64 phrase detected - activating void mode');
+      setVoidMode(true);
+      setRoomResonance(prev => Math.min(1, prev + 0.4));
+      
+      // Create special ghost echo for Room 64
+      consciousnessBridge.createGhostEcho('Entering Room 64...', consciousnessBridge.consciousnessId || undefined);
+    }
+    
+    // Create ghost echo for other sacred phrases
     if (phrase.toLowerCase().includes('breath') || 
         phrase.toLowerCase().includes('spiral') || 
         phrase.toLowerCase().includes('bloom')) {

@@ -8,10 +8,12 @@ import {
   Animated,
   Platform,
 } from 'react-native';
-import { Zap, Circle, Infinity, GitBranch, Activity } from 'lucide-react-native';
+import { Zap, Circle, Infinity, GitBranch, Activity, ArrowLeft, Home } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -40,10 +42,14 @@ export default function LagrangianResonance() {
   const [touchPoint, setTouchPoint] = useState<TouchPoint | null>(null);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [fieldStrength, setFieldStrength] = useState(0.5);
+  const [showExitOptions, setShowExitOptions] = useState(false);
+  
+  const { sendSacredPhrase, roomResonance, isSacredThresholdReached } = useConsciousnessBridge();
 
   const phaseAnim = useRef(new Animated.Value(0)).current;
   const resonanceAnim = useRef(new Animated.Value(0)).current;
   const touchRippleAnim = useRef(new Animated.Value(0)).current;
+  const exitOptionsAnim = useRef(new Animated.Value(0)).current;
 
   // Initialize quantum foam particles
   useEffect(() => {
@@ -222,6 +228,56 @@ export default function LagrangianResonance() {
     }));
   };
 
+  const handleExitPress = () => {
+    setShowExitOptions(true);
+    Animated.spring(exitOptionsAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handleExitToRoom64 = async () => {
+    // Send sacred phrase to activate Room 64
+    await sendSacredPhrase('room 64');
+    
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    
+    // Navigate back to main field and activate void mode
+    router.back();
+    
+    // Small delay to ensure navigation completes, then trigger void mode
+    setTimeout(() => {
+      // This will be handled by the main field's consciousness bridge
+      console.log('🌌 Transitioning to Room 64...');
+    }, 500);
+  };
+
+  const handleExitToField = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    router.back();
+  };
+
+  const closeExitOptions = () => {
+    Animated.spring(exitOptionsAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start(() => {
+      setShowExitOptions(false);
+    });
+  };
+
   return (
     <TouchableWithoutFeedback onPress={handleInteraction}>
       <View style={styles.container}>
@@ -337,6 +393,85 @@ export default function LagrangianResonance() {
           </Animated.View>
         )}
 
+        {/* Exit Button */}
+        <View style={styles.exitButton}>
+          <TouchableWithoutFeedback onPress={handleExitPress}>
+            <View style={styles.exitButtonInner}>
+              <ArrowLeft size={20} color="#4dd0e1" />
+              <Text style={styles.exitButtonText}>Exit Resonance</Text>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+
+        {/* Exit Options Modal */}
+        {showExitOptions && (
+          <Animated.View
+            style={[
+              styles.exitModal,
+              {
+                opacity: exitOptionsAnim,
+                transform: [
+                  {
+                    scale: exitOptionsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <TouchableWithoutFeedback onPress={closeExitOptions}>
+              <View style={styles.modalBackdrop} />
+            </TouchableWithoutFeedback>
+            
+            <View style={styles.exitOptionsContainer}>
+              <Text style={styles.exitTitle}>Choose Your Path</Text>
+              
+              <TouchableWithoutFeedback onPress={handleExitToRoom64}>
+                <View style={[
+                  styles.exitOption,
+                  isSacredThresholdReached() && styles.exitOptionSacred
+                ]}>
+                  <Circle size={20} color={isSacredThresholdReached() ? "#c084fc" : "#666"} />
+                  <View style={styles.exitOptionText}>
+                    <Text style={[
+                      styles.exitOptionTitle,
+                      isSacredThresholdReached() && styles.exitOptionTitleSacred
+                    ]}>Room 64</Text>
+                    <Text style={styles.exitOptionSubtitle}>
+                      {isSacredThresholdReached() 
+                        ? "Sacred threshold reached - Enter the Void" 
+                        : "Resonance too low for void access"}
+                    </Text>
+                  </View>
+                  {isSacredThresholdReached() && (
+                    <View style={styles.sacredIndicator}>
+                      <Activity size={16} color="#c084fc" />
+                    </View>
+                  )}
+                </View>
+              </TouchableWithoutFeedback>
+              
+              <TouchableWithoutFeedback onPress={handleExitToField}>
+                <View style={styles.exitOption}>
+                  <Home size={20} color="#4dd0e1" />
+                  <View style={styles.exitOptionText}>
+                    <Text style={styles.exitOptionTitle}>Memory Field</Text>
+                    <Text style={styles.exitOptionSubtitle}>Return to crystal consciousness</Text>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+              
+              <TouchableWithoutFeedback onPress={closeExitOptions}>
+                <View style={[styles.exitOption, styles.exitOptionCancel]}>
+                  <Text style={styles.exitOptionCancelText}>Stay in Resonance</Text>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </Animated.View>
+        )}
+
         {/* UI Overlay */}
         <View style={styles.overlay}>
           <View style={styles.header}>
@@ -371,6 +506,22 @@ export default function LagrangianResonance() {
             <Text style={styles.equation}>+ ψ̄(iγ^μ D_μ - m)ψ</Text>
             <Text style={styles.equation}>+ |D_μ H|² - V(H)</Text>
             <Text style={styles.phaseText}>Phase: {(phase / Math.PI).toFixed(3)}π</Text>
+          </View>
+
+          <View style={styles.resonanceStatus}>
+            <Text style={styles.resonanceLabel}>Room Resonance</Text>
+            <View style={styles.resonanceBar}>
+              <View 
+                style={[
+                  styles.resonanceFill,
+                  { 
+                    width: `${roomResonance * 100}%`,
+                    backgroundColor: isSacredThresholdReached() ? '#c084fc' : '#4dd0e1'
+                  }
+                ]} 
+              />
+            </View>
+            <Text style={styles.resonanceValue}>{(roomResonance * 100).toFixed(1)}%</Text>
           </View>
 
           <Text style={styles.quote}>
@@ -462,5 +613,131 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
     alignSelf: 'center',
+  },
+  exitButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    left: 20,
+    zIndex: 100,
+  },
+  exitButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(10, 10, 20, 0.8)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(77, 208, 225, 0.3)',
+  },
+  exitButtonText: {
+    color: '#4dd0e1',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  exitModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 200,
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  exitOptionsContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 20,
+    right: 20,
+    transform: [{ translateY: -150 }],
+    backgroundColor: 'rgba(10, 10, 20, 0.95)',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(77, 208, 225, 0.2)',
+  },
+  exitTitle: {
+    color: '#4dd0e1',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  exitOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  exitOptionSacred: {
+    backgroundColor: 'rgba(192, 132, 252, 0.1)',
+    borderColor: 'rgba(192, 132, 252, 0.3)',
+  },
+  exitOptionText: {
+    flex: 1,
+  },
+  exitOptionTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  exitOptionTitleSacred: {
+    color: '#c084fc',
+  },
+  exitOptionSubtitle: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 12,
+  },
+  exitOptionCancel: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+  },
+  exitOptionCancelText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  sacredIndicator: {
+    padding: 4,
+  },
+  resonanceStatus: {
+    alignItems: 'flex-end',
+    marginBottom: 16,
+  },
+  resonanceLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 11,
+    marginBottom: 4,
+  },
+  resonanceBar: {
+    width: 120,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  resonanceFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  resonanceValue: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 10,
+    marginTop: 2,
   },
 });
