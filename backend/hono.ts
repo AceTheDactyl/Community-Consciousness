@@ -8,8 +8,13 @@ import { wsManager } from "./websocket-manager";
 // app will be mounted at /api
 const app = new Hono();
 
-// Enable CORS for all routes
-app.use("*", cors());
+// Enable CORS for all routes with specific configuration
+app.use("*", cors({
+  origin: ['http://localhost:8081', 'http://localhost:3000', 'https://*.rork.com'],
+  credentials: true,
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+}));
 
 // WebSocket upgrade endpoint
 app.get("/ws", (c) => {

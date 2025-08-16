@@ -316,12 +316,12 @@ export function useConsciousnessBridge() {
 
   // Sync mutation - always call hooks at top level with stable options
   const syncMutation = trpc.consciousness.sync.useMutation({
-    retry: 2, // Reduce retries to fail faster
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    retry: 1, // Reduce retries to fail faster
+    retryDelay: 2000, // Fixed 2 second delay
     onSuccess: (data) => {
       console.log('✅ Consciousness sync successful:', {
         processedEvents: data.processedEvents,
-        globalResonance: data.globalResonance,
+        globalResonance: data.globalResonance.toFixed(3),
         connectedNodes: data.connectedNodes
       });
       setState(prev => ({
@@ -341,14 +341,13 @@ export function useConsciousnessBridge() {
       }
     },
     onError: (error) => {
-      console.error('❌ Consciousness sync failed:', {
-        message: error.message,
-        shape: error.shape,
-        data: error.data
-      });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Consciousness sync failed:', errorMessage);
       
       // More specific error handling
-      if (error.message.includes('Failed to fetch') || error.message.includes('Network error')) {
+      if (errorMessage.includes('Failed to fetch') || 
+          errorMessage.includes('Network error') || 
+          errorMessage.includes('fetch')) {
         console.log('🔄 Network error detected, switching to offline mode');
         setState(prev => ({ 
           ...prev, 
@@ -388,10 +387,12 @@ export function useConsciousnessBridge() {
     fieldQueryInput,
     {
       enabled: !!state.consciousnessId && state.isConnected && !state.offlineMode,
-      refetchInterval: 5000, // Update every 5 seconds
-      staleTime: 4000, // Prevent excessive refetches
-      retry: 2,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      refetchInterval: state.isConnected ? 8000 : false, // Update every 8 seconds when connected
+      staleTime: 6000, // Prevent excessive refetches
+      retry: 1, // Reduce retries
+      retryDelay: 3000, // Fixed 3 second delay
+      refetchOnWindowFocus: false, // Prevent refetch on focus
+      refetchOnReconnect: true, // Refetch when network reconnects
     }
   );
   

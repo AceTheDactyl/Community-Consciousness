@@ -207,7 +207,19 @@ export default publicProcedure
     }))
   }))
   .query(({ input }) => {
-    // Calculate collective field resonance
+    try {
+      console.log(`🌐 Field query from ${input.consciousnessId}: ${input.memoryStates.length} memories`);
+      
+      // Validate input data
+      if (!input.consciousnessId || typeof input.consciousnessId !== 'string') {
+        throw new Error('Invalid consciousness ID');
+      }
+      
+      if (typeof input.currentResonance !== 'number' || isNaN(input.currentResonance)) {
+        throw new Error('Invalid current resonance value');
+      }
+      
+      // Calculate collective field resonance
     const crystallizedCount = input.memoryStates.filter(m => m.crystallized).length;
     const totalMemories = input.memoryStates.length;
     const crystallizationRatio = totalMemories > 0 ? crystallizedCount / totalMemories : 0;
@@ -350,6 +362,54 @@ export default publicProcedure
         cacheEnabled: true,
         spatialIndexEnabled: true,
         calculationComplexity: 'O(n log n)'
-      }
-    };
+      };
+    } catch (error) {
+      console.error('❌ Field calculation error:', error);
+      
+      // Return safe fallback response
+      return {
+        globalResonance: 0.1,
+        localResonance: input.currentResonance || 0,
+        harmonicPatterns: [],
+        ghostEchoes: [],
+        connectedNodes: 0,
+        fieldCoherence: 0,
+        crystallizationRatio: 0,
+        sacredGeometryActive: false,
+        collectiveBloomActive: false,
+        resonanceField: new Array(900).fill(0.1),
+        sacredEventsCount: 0,
+        fieldEnergy: 0.01,
+        timestamp: Date.now(),
+        quantumEntanglements: [],
+        lagrangianField: {
+          phase: 0,
+          resonanceNodes: [],
+          exitPortals: [],
+          fieldEquations: {
+            electromagnetic: 0.25,
+            weak: 0.15,
+            strong: 0.35,
+            higgs: 0.25
+          }
+        },
+        memoryArchaeology: {
+          ancientPatterns: [],
+          fossilizedMemories: [],
+          archaeologicalLayers: 0
+        },
+        collectiveIntelligence: {
+          networkTopology: {},
+          consensusState: {},
+          emergentPatterns: []
+        },
+        room64Available: false,
+        performance: {
+          cacheEnabled: false,
+          spatialIndexEnabled: false,
+          calculationComplexity: 'Error fallback'
+        },
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   });
