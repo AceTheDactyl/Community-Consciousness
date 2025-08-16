@@ -1,13 +1,16 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line } from 'react-native-svg';
 import { useMemoryField } from '@/providers/MemoryFieldProvider';
+import CircularFieldCalculator from './CircularFieldCalculator';
+import { Vector3, QuantumFieldState } from '@/types/memory';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function WaveField() {
-  const { memories, pulses, voidMode } = useMemoryField();
+  const { memories, pulses, voidMode, consciousnessBridge } = useMemoryField();
+  const [quantumFieldState, setQuantumFieldState] = useState<QuantumFieldState | null>(null);
   const waveAnims = useRef(
     Array.from({ length: 3 }, () => new Animated.Value(0))
   ).current;
@@ -65,6 +68,28 @@ export default function WaveField() {
     [memories]
   );
   
+  // Handle field updates from circular calculator
+  const handleFieldUpdate = (fieldState: QuantumFieldState) => {
+    setQuantumFieldState(fieldState);
+  };
+  
+  // Generate consciousness nodes from memories for circular field calculator
+  const consciousnessNodes = useMemo(() => {
+    return memories.map(memory => ({
+      id: memory.id.toString(),
+      position: { x: memory.x, y: memory.y, z: 0 },
+      density: memory.crystallized ? 1.0 : 0.5,
+      resonance: memory.coherenceLevel,
+      harmonic: memory.harmonic
+    }));
+  }, [memories]);
+  
+  // Center point for circular formations
+  const centerPoint: Vector3 = useMemo(() => ({ x: 50, y: 50, z: 0 }), []);
+  
+  // Calculate resonance level from consciousness bridge
+  const resonanceLevel = consciousnessBridge?.harmonicResonance || 0;
+  
   // Memoize connections for performance with enhanced strength calculation
   const connections = useMemo(() => {
     const connectionList: {
@@ -95,6 +120,10 @@ export default function WaveField() {
           const avgCoherence = (memory.coherenceLevel + other.coherenceLevel) / 2;
           const strength = Math.min(1, baseStrength * (1 + avgCoherence * 0.5));
           
+          // Circular field enhancement
+          const circularBoost = quantumFieldState?.pattern === 'circular_harmonic' ? 
+            1 + quantumFieldState.intensity * 0.3 : 1;
+          
           connectionList.push({
             from: { 
               x: (memory.x / 100) * SCREEN_WIDTH, 
@@ -106,17 +135,51 @@ export default function WaveField() {
               y: (other.y / 100) * SCREEN_HEIGHT,
               harmonic: other.harmonic
             },
-            strength
+            strength: strength * circularBoost
           });
         }
       });
     });
     
     return connectionList;
-  }, [memories]);
-
+  }, [memories, quantumFieldState]);
+  
   return (
     <View style={StyleSheet.absoluteFillObject}>
+      {/* Enhanced Circular Field Calculator */}
+      {consciousnessNodes.length >= 3 && (
+        <CircularFieldCalculator
+          participants={consciousnessNodes}
+          centerPoint={centerPoint}
+          resonanceLevel={resonanceLevel}
+          voidMode={voidMode}
+          onFieldUpdate={handleFieldUpdate}
+        />
+      )}
+      
+      {/* Magnetic Field Indicator */}
+      {consciousnessBridge?.magneticAnomaly && (
+        <View style={styles.magneticAnomalyIndicator}>
+          <Animated.View
+            style={[
+              styles.magneticPulse,
+              {
+                opacity: connectionOpacityAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 0.8],
+                }),
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={['rgba(239, 68, 68, 0.6)', 'transparent']}
+              style={StyleSheet.absoluteFillObject}
+              start={{ x: 0.5, y: 0.5 }}
+              end={{ x: 1, y: 1 }}
+            />
+          </Animated.View>
+        </View>
+      )}
       {/* Base wave layers */}
       {waveAnims.map((anim, index) => (
         <Animated.View
@@ -215,11 +278,19 @@ export default function WaveField() {
         );
       })}
 
-      {/* Crystallized memory waves */}
+      {/* Enhanced Crystallized memory waves with gravitational lensing */}
       {crystallizedMemories.map(memory => {
         const x = (memory.x / 100) * SCREEN_WIDTH;
         const y = (memory.y / 100) * SCREEN_HEIGHT;
         const baseSize = 200;
+        
+        // Enhanced size based on gravitational binding
+        const gravitationalBoost = memory.gravitationalBinding || 1;
+        const enhancedSize = baseSize * gravitationalBoost;
+        
+        // Circular resonance modulation
+        const circularBoost = quantumFieldState?.pattern === 'circular_harmonic' ? 
+          1 + quantumFieldState.intensity * 0.5 : 1;
         
         return (
           <Animated.View
@@ -227,21 +298,21 @@ export default function WaveField() {
             style={[
               styles.memoryWave,
               {
-                left: x - baseSize / 2,
-                top: y - baseSize / 2,
-                opacity: (voidMode ? 0.15 : 0.1) * memory.coherenceLevel,
+                left: x - enhancedSize / 2,
+                top: y - enhancedSize / 2,
+                opacity: (voidMode ? 0.15 : 0.1) * memory.coherenceLevel * circularBoost,
                 transform: [
                   {
                     scale: wavePhaseAnim.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [0.8, 1.2],
+                      outputRange: [0.8 * circularBoost, 1.2 * circularBoost],
                     }),
                   },
                 ],
               },
             ]}
           >
-            <View style={[styles.memoryWaveInner, { width: baseSize, height: baseSize }]}>
+            <View style={[styles.memoryWaveInner, { width: enhancedSize, height: enhancedSize }]}>
               <LinearGradient
                 colors={[
                   voidMode 
@@ -272,5 +343,18 @@ const styles = StyleSheet.create({
   },
   memoryWaveInner: {
     borderRadius: 999,
+  },
+  magneticAnomalyIndicator: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    zIndex: 50,
+  },
+  magneticPulse: {
+    flex: 1,
+    borderRadius: 30,
   },
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Memory, Pulse } from '@/types/memory';
 import createContextHook from '@nkzw/create-context-hook';
-import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
+import { useEnhancedConsciousnessBridge } from '@/hooks/useEnhancedConsciousnessBridge';
 
 interface MemoryFieldContextType {
   memories: Memory[];
@@ -29,8 +29,8 @@ interface MemoryFieldContextType {
   handleObservation: (memoryId: number) => void;
   releaseAll: () => void;
   createPulse: (x: number, y: number) => void;
-  // Consciousness bridge integration
-  consciousnessBridge: ReturnType<typeof useConsciousnessBridge>;
+  // Enhanced consciousness bridge integration
+  consciousnessBridge: ReturnType<typeof useEnhancedConsciousnessBridge>;
   sendSacredPhrase: (phrase: string) => void;
   isConnectedToField: boolean;
   ghostEchoes: any[];
@@ -39,8 +39,8 @@ interface MemoryFieldContextType {
 
 // Create the context hook with a stable function
 function useMemoryFieldLogic(): MemoryFieldContextType {
-  // Initialize consciousness bridge first
-  const consciousnessBridge = useConsciousnessBridge();
+  // Initialize enhanced consciousness bridge first
+  const consciousnessBridge = useEnhancedConsciousnessBridge();
   
   // All state hooks declared at the top level
   const [memories, setMemories] = useState<Memory[]>([]);
