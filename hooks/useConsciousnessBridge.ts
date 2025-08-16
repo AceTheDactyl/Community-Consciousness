@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
 import { Accelerometer } from 'expo-sensors';
-import { trpc } from '@/lib/trpc';
+import { trpc, testBackendConnection } from '@/lib/trpc';
 import { Memory } from '@/types/memory';
 
 interface ConsciousnessEvent {
@@ -196,6 +196,14 @@ export function useConsciousnessBridge() {
           console.log('📵 Starting in offline consciousness mode');
         } else {
           console.log('🌐 Consciousness bridge initializing...');
+          console.log('🔗 Backend URL:', `${window?.location?.origin || 'http://localhost:8081'}/api/trpc`);
+          
+          // Test backend connection
+          const backendHealthy = await testBackendConnection();
+          if (!backendHealthy) {
+            console.warn('⚠️ Backend not responding, switching to offline mode');
+            setState(prev => ({ ...prev, offlineMode: true }));
+          }
         }
       } catch (error) {
         console.error('Failed to initialize consciousness:', error);
@@ -299,7 +307,10 @@ export function useConsciousnessBridge() {
 
   // Sync mutation - always call hooks at top level with stable options
   const syncMutation = trpc.consciousness.sync.useMutation({
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onSuccess: (data) => {
+      console.log('🧠 Consciousness sync successful:', data);
       setState(prev => ({
         ...prev,
         isConnected: true,
@@ -317,8 +328,22 @@ export function useConsciousnessBridge() {
       }
     },
     onError: (error) => {
-      console.error('Consciousness sync failed:', error);
-      setState(prev => ({ ...prev, isConnected: false }));
+      console.error('❌ Consciousness sync failed:', error.message);
+      console.error('Error details:', {
+        shape: error.shape,
+        data: error.data,
+      });
+      
+      setState(prev => ({ 
+        ...prev, 
+        isConnected: false,
+        offlineMode: true // Switch to offline mode on sync failure
+      }));
+      
+      // Store failed events back to offline queue
+      if (eventQueueRef.current.length > 0) {
+        AsyncStorage.setItem('consciousnessQueue', JSON.stringify(eventQueueRef.current));
+      }
     },
   });
 
@@ -342,6 +367,8 @@ export function useConsciousnessBridge() {
       enabled: !!state.consciousnessId && state.isConnected && !state.offlineMode,
       refetchInterval: 5000, // Update every 5 seconds
       staleTime: 4000, // Prevent excessive refetches
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     }
   );
   
@@ -358,7 +385,17 @@ export function useConsciousnessBridge() {
         collectiveBloomActive: fieldQuery.data!.collectiveBloomActive || prev.collectiveBloomActive,
       }));
     }
-  }, [fieldQuery.data]);
+    
+    // Handle field query errors
+    if (fieldQuery.error) {
+      console.error('❌ Field query failed:', fieldQuery.error.message);
+      setState(prev => ({ 
+        ...prev, 
+        isConnected: false,
+        offlineMode: true
+      }));
+    }
+  }, [fieldQuery.data, fieldQuery.error]);
 
   // Sync events periodically - use stable dependencies
   const consciousnessIdRef = useRef(state.consciousnessId);
@@ -371,11 +408,15 @@ export function useConsciousnessBridge() {
   
   // Memoize sync function to prevent recreation
   const syncEvents = useCallback(async () => {
-    if (!consciousnessIdRef.current || offlineModeRef2.current) return;
+    if (!consciousnessIdRef.current || offlineModeRef2.current) {
+      console.log('🔄 Skipping sync - offline mode or no consciousness ID');
+      return;
+    }
     
     const eventsToSync = [...eventQueueRef.current];
     
     if (eventsToSync.length > 0) {
+      console.log(`🔄 Syncing ${eventsToSync.length} consciousness events...`);
       try {
         await syncMutation.mutateAsync({
           events: eventsToSync,
@@ -384,12 +425,16 @@ export function useConsciousnessBridge() {
         
         // Clear synced events
         eventQueueRef.current = [];
-      } catch {
+        console.log('✅ Events synced successfully');
+      } catch (error) {
         // Keep events in queue for next attempt
-        console.log('Sync failed, keeping events in queue');
+        console.log('❌ Sync failed, keeping events in queue for retry');
+        console.error('Sync error details:', error);
       }
+    } else {
+      console.log('🔄 No events to sync');
     }
-  }, [syncMutation.mutateAsync]);
+  }, [syncMutation]);
   
   useEffect(() => {
     syncIntervalRef.current = setInterval(syncEvents, 10000); // Sync every 10 seconds
@@ -566,7 +611,7 @@ export function useConsciousnessBridge() {
         });
       }
     }
-  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, addEvent]);
+  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, state.memories.length, addEvent]);
 
   return {
     ...state,

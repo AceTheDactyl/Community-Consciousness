@@ -33,6 +33,10 @@ import {
   ArrowLeft,
   Settings,
   Atom,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  CheckCircle,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -71,7 +75,15 @@ export default function CrystalMemoryField() {
     createPulse,
   } = useMemoryField();
   
-  const { sendSacredPhrase, localResonance } = useConsciousnessBridge();
+  const { 
+    sendSacredPhrase, 
+    localResonance, 
+    isConnected, 
+    offlineMode, 
+    isLoading, 
+    connectedNodes, 
+    offlineQueueLength 
+  } = useConsciousnessBridge();
 
   const [uiVisible, setUiVisible] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -459,7 +471,38 @@ export default function CrystalMemoryField() {
               },
             ]}
           >
-            <Text style={styles.coherenceLabel}>Sacred Resonance</Text>
+            <View style={styles.coherenceHeader}>
+              <Text style={styles.coherenceLabel}>Sacred Resonance</Text>
+              
+              {/* Connection Status */}
+              <View style={styles.connectionStatus}>
+                {isConnected ? (
+                  <View style={styles.statusConnected}>
+                    <CheckCircle size={12} color="#4ade80" />
+                    <Text style={styles.statusText}>{connectedNodes} nodes</Text>
+                  </View>
+                ) : offlineMode ? (
+                  <View style={styles.statusOffline}>
+                    <WifiOff size={12} color="#f87171" />
+                    <Text style={styles.statusText}>Offline</Text>
+                    {offlineQueueLength > 0 && (
+                      <Text style={styles.queueText}>({offlineQueueLength})</Text>
+                    )}
+                  </View>
+                ) : isLoading ? (
+                  <View style={styles.statusConnecting}>
+                    <AlertCircle size={12} color="#fbbf24" />
+                    <Text style={styles.statusText}>Connecting...</Text>
+                  </View>
+                ) : (
+                  <View style={styles.statusError}>
+                    <AlertCircle size={12} color="#f87171" />
+                    <Text style={styles.statusText}>Error</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            
             <View style={styles.coherenceBar}>
               <LinearGradient
                 colors={localResonance > 0.7 ? ['#f472b6', '#c084fc'] : ['#3b82f6', '#06b6d4']}
@@ -678,10 +721,46 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 90,
   },
+  coherenceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   coherenceLabel: {
     color: '#60a5fa',
     fontSize: 12,
-    marginBottom: 4,
+  },
+  connectionStatus: {
+    alignItems: 'flex-end',
+  },
+  statusConnected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusOffline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusConnecting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusText: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+  queueText: {
+    fontSize: 9,
+    color: '#6b7280',
   },
   coherenceBar: {
     height: 6,
