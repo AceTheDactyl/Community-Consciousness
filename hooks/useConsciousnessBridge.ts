@@ -92,7 +92,7 @@ export function useConsciousnessBridge() {
   const accelBuffer = useRef<{x: number, y: number, z: number}[]>([]);
   const resonanceDecayInterval = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  // Methods to add events - use ref to prevent dependency issues
+  // Methods to add events
   const addEvent = useCallback((type: ConsciousnessEvent['type'], data: Record<string, any>) => {
     const event: ConsciousnessEvent = {
       type,
@@ -102,9 +102,9 @@ export function useConsciousnessBridge() {
     };
     
     eventQueueRef.current.push(event);
-  }, []); // Remove state dependency to prevent infinite loops
+  }, [state.consciousnessId]);
 
-  // Spiral gesture detection function - use refs to prevent dependency issues
+  // Spiral gesture detection function
   const detectSpiralGesture = useCallback(({ x, y, z }: {x: number, y: number, z: number}) => {
     // Store recent accelerations for pattern detection
     accelBuffer.current.push({ x, y, z });
@@ -126,14 +126,7 @@ export function useConsciousnessBridge() {
         const now = Date.now();
         setState(prev => {
           if (now - prev.lastSpiralGesture > 2000) { // Prevent spam
-            // Use ref to access current event queue
-            const event: ConsciousnessEvent = {
-              type: 'SPIRAL_GESTURE',
-              data: { variance, timestamp: now },
-              timestamp: now,
-              deviceId: prev.consciousnessId || undefined,
-            };
-            eventQueueRef.current.push(event);
+            addEvent('SPIRAL_GESTURE', { variance, timestamp: now });
             
             // Haptic feedback for spiral
             if (Platform.OS !== 'web') {
@@ -151,7 +144,7 @@ export function useConsciousnessBridge() {
         accelBuffer.current = []; // Reset after detection
       }
     }
-  }, []); // Remove addEvent dependency
+  }, [addEvent]);
 
   // Initialize consciousness bridge
   useEffect(() => {
@@ -235,14 +228,7 @@ export function useConsciousnessBridge() {
                 localResonance: Math.min(1, prev.localResonance + 0.01)
               }));
               
-              // Add event directly to queue
-              const event: ConsciousnessEvent = {
-                type: 'BREATHING_DETECTED',
-                data: { magnitude, breathing },
-                timestamp: Date.now(),
-                deviceId: state.consciousnessId || undefined,
-              };
-              eventQueueRef.current.push(event);
+              addEvent('BREATHING_DETECTED', { magnitude, breathing });
             }
             
             // Detect spiral gestures
@@ -261,7 +247,7 @@ export function useConsciousnessBridge() {
         accelerometerSubscription.current.remove();
       }
     };
-  }, []); // Remove all dependencies to prevent infinite loops
+  }, [addEvent, detectSpiralGesture]);
 
 
 
@@ -454,69 +440,39 @@ export function useConsciousnessBridge() {
       }));
     }
 
-    // Add to sacred buffer and event queue
-    setState(prev => {
-      const timestamp = Date.now();
-      const newEntry: SacredBufferEntry = {
-        phrase,
-        timestamp,
-        resonance: prev.localResonance,
-        sacred: isSacred
-      };
-      
-      // Add event directly to queue
-      const event: ConsciousnessEvent = {
-        type: 'SACRED_PHRASE',
-        data: { phrase, sacred: isSacred },
-        timestamp,
-        deviceId: prev.consciousnessId || undefined,
-      };
-      eventQueueRef.current.push(event);
-      
-      return {
-        ...prev,
-        sacredBuffer: [...prev.sacredBuffer, newEntry].slice(-10) // Keep last 10
-      };
-    });
+    // Add to sacred buffer
+    const timestamp = Date.now();
+    const newEntry: SacredBufferEntry = {
+      phrase,
+      timestamp,
+      resonance: state.localResonance,
+      sacred: isSacred
+    };
+    
+    setState(prev => ({
+      ...prev,
+      sacredBuffer: [...prev.sacredBuffer, newEntry].slice(-10) // Keep last 10
+    }));
+
+    addEvent('SACRED_PHRASE', { phrase, sacred: isSacred });
     
     // Immediate haptic feedback
     if (Platform.OS !== 'web') {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [sacredPhrases]); // Remove addEvent and state dependencies
+  }, [sacredPhrases, addEvent, state.localResonance]);
 
   const sendMemoryCrystallization = useCallback((memoryId: number, harmonic: number) => {
-    const event: ConsciousnessEvent = {
-      type: 'MEMORY_CRYSTALLIZE',
-      data: { memoryId, harmonic },
-      timestamp: Date.now(),
-      deviceId: state.consciousnessId || undefined,
-    };
-    eventQueueRef.current.push(event);
-  }, []);
+    addEvent('MEMORY_CRYSTALLIZE', { memoryId, harmonic });
+  }, [addEvent]);
 
   const sendPulseCreation = useCallback((x: number, y: number) => {
-    const event: ConsciousnessEvent = {
-      type: 'PULSE_CREATE',
-      data: { x, y },
-      timestamp: Date.now(),
-      deviceId: state.consciousnessId || undefined,
-    };
-    eventQueueRef.current.push(event);
-  }, []);
+    addEvent('PULSE_CREATE', { x, y });
+  }, [addEvent]);
 
   const sendTouchRipple = useCallback((x: number, y: number) => {
-    setState(prev => {
-      const event: ConsciousnessEvent = {
-        type: 'TOUCH_RIPPLE',
-        data: { x, y, resonance: prev.localResonance },
-        timestamp: Date.now(),
-        deviceId: prev.consciousnessId || undefined,
-      };
-      eventQueueRef.current.push(event);
-      return prev;
-    });
-  }, []);
+    addEvent('TOUCH_RIPPLE', { x, y, resonance: state.localResonance });
+  }, [addEvent, state.localResonance]);
 
   const updateFieldState = useCallback((memories: Memory[]) => {
     // Use ref to prevent infinite loops
@@ -529,8 +485,8 @@ export function useConsciousnessBridge() {
         return !newMem || 
           prevMem.id !== newMem.id ||
           prevMem.crystallized !== newMem.crystallized ||
-          Math.abs(prevMem.x - newMem.x) > 2 || // Increased threshold
-          Math.abs(prevMem.y - newMem.y) > 2;
+          Math.abs(prevMem.x - newMem.x) > 1 || // Increased threshold
+          Math.abs(prevMem.y - newMem.y) > 1;
       });
     
     if (!hasChanged) return;
@@ -543,17 +499,10 @@ export function useConsciousnessBridge() {
       y: Math.round(m.y),
     }));
     
-    // Add event directly to queue
-    const event: ConsciousnessEvent = {
-      type: 'FIELD_UPDATE',
-      data: { memoryStates },
-      timestamp: Date.now(),
-      deviceId: state.consciousnessId || undefined,
-    };
-    eventQueueRef.current.push(event);
+    addEvent('FIELD_UPDATE', { memoryStates });
     
     setState(prev => ({ ...prev, memories }));
-  }, []); // Remove addEvent dependency
+  }, [addEvent]);
   
   const memoriesRef = useRef<Memory[]>([]);
   useEffect(() => {
@@ -595,7 +544,7 @@ export function useConsciousnessBridge() {
   
   useEffect(() => {
     const now = Date.now();
-    if (now - lastBloomCheck.current < 3000) return; // Throttle to once per 3 seconds
+    if (now - lastBloomCheck.current < 2000) return; // Throttle to once per 2 seconds
     
     const totalMemories = state.memories.length;
     const crystallizationRatio = totalMemories > 0 ? crystallizedCount / totalMemories : 0;
@@ -611,19 +560,6 @@ export function useConsciousnessBridge() {
         setState(prev => {
           if (prev.collectiveBloomActive) return prev; // Prevent duplicate updates
           
-          // Add event directly to queue
-          const event: ConsciousnessEvent = {
-            type: 'COLLECTIVE_BLOOM',
-            data: { 
-              crystallizationRatio, 
-              resonance: prev.localResonance,
-              timestamp: Date.now()
-            },
-            timestamp: Date.now(),
-            deviceId: prev.consciousnessId || undefined,
-          };
-          eventQueueRef.current.push(event);
-          
           return {
             ...prev,
             collectiveBloomActive: true,
@@ -638,9 +574,15 @@ export function useConsciousnessBridge() {
           setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 200);
           setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 400);
         }
+        
+        addEvent('COLLECTIVE_BLOOM', { 
+          crystallizationRatio, 
+          resonance: state.localResonance,
+          timestamp: Date.now()
+        });
       }
     }
-  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, state.memories.length]); // Remove addEvent dependency
+  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, state.memories.length, addEvent]);
 
   return {
     ...state,
@@ -671,23 +613,14 @@ export function useConsciousnessBridge() {
       addEvent('GHOST_ECHO', { text, sourceId });
     },
     crystallizeMemory: (memoryId: number) => {
-      setState(prev => {
-        // Add event directly to queue
-        const event: ConsciousnessEvent = {
-          type: 'CRYSTALLIZATION',
-          data: { memoryId, timestamp: Date.now() },
-          timestamp: Date.now(),
-          deviceId: prev.consciousnessId || undefined,
-        };
-        eventQueueRef.current.push(event);
-        
-        return {
-          ...prev,
-          memories: prev.memories.map(m => 
-            m.id === memoryId ? { ...m, crystallized: true } : m
-          )
-        };
-      });
+      setState(prev => ({
+        ...prev,
+        memories: prev.memories.map(m => 
+          m.id === memoryId ? { ...m, crystallized: true } : m
+        )
+      }));
+      
+      addEvent('CRYSTALLIZATION', { memoryId, timestamp: Date.now() });
       
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

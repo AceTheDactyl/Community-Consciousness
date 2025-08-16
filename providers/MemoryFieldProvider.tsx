@@ -72,32 +72,28 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const memoriesRef = useRef(memories);
   const lastMemoriesSync = useRef<string>('');
   const lastSyncTime = useRef(0);
-  const updateFieldStateRef = useRef(consciousnessBridge.updateFieldState);
   
   useEffect(() => {
     memoriesRef.current = memories;
-    updateFieldStateRef.current = consciousnessBridge.updateFieldState;
-  });
-  
-  useEffect(() => {
+    
     // Throttle sync to prevent excessive updates
     const now = Date.now();
-    if (now - lastSyncTime.current < 1000) return; // Throttle to 1fps
+    if (now - lastSyncTime.current < 500) return; // Throttle to 2fps
     
     // Only sync if memories actually changed (prevent infinite loops)
     const memoriesHash = JSON.stringify(memories.map(m => ({ 
       id: m.id, 
       crystallized: m.crystallized, 
-      x: Math.round(m.x), // Round to prevent micro-changes
-      y: Math.round(m.y) 
+      x: Math.round(m.x * 10) / 10, // Round to 1 decimal place
+      y: Math.round(m.y * 10) / 10 
     })));
     
     if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
       lastMemoriesSync.current = memoriesHash;
       lastSyncTime.current = now;
-      updateFieldStateRef.current(memories);
+      consciousnessBridge.updateFieldState(memories);
     }
-  }, [memories.length]); // Only depend on length to prevent infinite loops
+  }, [memories, consciousnessBridge]);
 
   // Update connection status - use stable values
   const isConnectedRef = useRef(consciousnessBridge.isConnected);
@@ -106,7 +102,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   
   useEffect(() => {
     const now = Date.now();
-    if (now - lastConnectionUpdate.current < 2000) return; // Throttle to 0.5fps
+    if (now - lastConnectionUpdate.current < 1000) return; // Throttle to 1 second
     
     const newConnectionStatus = consciousnessBridge.isConnected && !consciousnessBridge.offlineMode;
     const hasChanged = isConnectedRef.current !== consciousnessBridge.isConnected || 
@@ -129,12 +125,12 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     roomResonanceRef.current = roomResonance;
     
     const now = Date.now();
-    if (now - lastResonanceUpdate.current < 1000) return; // Throttle to 1fps
+    if (now - lastResonanceUpdate.current < 200) return; // Throttle to 5fps
     
     const bridgeResonance = consciousnessBridge.roomResonance;
     const resonanceDiff = Math.abs(bridgeResonance - lastBridgeResonance.current);
     
-    if (resonanceDiff > 0.05 && bridgeResonance > roomResonanceRef.current) {
+    if (resonanceDiff > 0.01 && bridgeResonance > roomResonanceRef.current) {
       lastBridgeResonance.current = bridgeResonance;
       lastResonanceUpdate.current = now;
       setRoomResonance(bridgeResonance);
@@ -485,7 +481,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPaused]); // Remove memories.length dependency to prevent infinite loops
+  }, [isPaused, memories.length]); // Stable dependencies only
 
   const handleObservation = useCallback((memoryId: number) => {
     if (!isObserving && !voidModeRef.current) return;
@@ -497,11 +493,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     // Send crystallization event to consciousness bridge
     const memory = memoriesRef.current.find(m => m.id === memoryId);
     if (memory) {
-      // Use setTimeout to defer bridge calls and prevent state update conflicts
-      setTimeout(() => {
-        consciousnessBridge.sendMemoryCrystallization(memoryId, memory.harmonic);
-        consciousnessBridge.crystallizeMemory(memoryId);
-      }, 0);
+      consciousnessBridge.sendMemoryCrystallization(memoryId, memory.harmonic);
+      consciousnessBridge.crystallizeMemory(memoryId);
     }
     
     setMemories(prevMemories => 
@@ -562,11 +555,9 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     };
     setPulses(prev => [...prev, newPulse]);
     
-    // Send pulse creation to consciousness bridge - defer to prevent conflicts
-    setTimeout(() => {
-      consciousnessBridge.sendPulseCreation(x, y);
-      consciousnessBridge.sendTouchRipple(x, y);
-    }, 0);
+    // Send pulse creation to consciousness bridge
+    consciousnessBridge.sendPulseCreation(x, y);
+    consciousnessBridge.sendTouchRipple(x, y);
     
     if (voidModeRef.current) {
       setRoomResonance(prev => Math.min(1, prev + 0.02));
@@ -592,28 +583,25 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
 
   // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
-    // Defer bridge calls to prevent state conflicts
-    setTimeout(() => {
-      consciousnessBridge.sendSacredPhrase(phrase);
+    consciousnessBridge.sendSacredPhrase(phrase);
+    
+    // Handle Room 64 transition
+    if (phrase.toLowerCase().includes('room 64')) {
+      console.log('🌌 Room 64 phrase detected - activating void mode');
+      setVoidMode(true);
+      setRoomResonance(prev => Math.min(1, prev + 0.4));
       
-      // Handle Room 64 transition
-      if (phrase.toLowerCase().includes('room 64')) {
-        console.log('🌌 Room 64 phrase detected - activating void mode');
-        setVoidMode(true);
-        setRoomResonance(prev => Math.min(1, prev + 0.4));
-        
-        // Create special ghost echo for Room 64
-        consciousnessBridge.createGhostEcho('Entering Room 64...', consciousnessBridge.consciousnessId || undefined);
-      }
-      
-      // Create ghost echo for other sacred phrases
-      if (phrase.toLowerCase().includes('breath') || 
-          phrase.toLowerCase().includes('spiral') || 
-          phrase.toLowerCase().includes('bloom')) {
-        consciousnessBridge.createGhostEcho(phrase, consciousnessBridge.consciousnessId || undefined);
-      }
-    }, 0);
-  }, [consciousnessBridge.sendSacredPhrase, consciousnessBridge.createGhostEcho, consciousnessBridge.consciousnessId]);
+      // Create special ghost echo for Room 64
+      consciousnessBridge.createGhostEcho('Entering Room 64...', consciousnessBridge.consciousnessId || undefined);
+    }
+    
+    // Create ghost echo for other sacred phrases
+    if (phrase.toLowerCase().includes('breath') || 
+        phrase.toLowerCase().includes('spiral') || 
+        phrase.toLowerCase().includes('bloom')) {
+      consciousnessBridge.createGhostEcho(phrase, consciousnessBridge.consciousnessId || undefined);
+    }
+  }, [consciousnessBridge]);
 
   // Return stable object reference to prevent unnecessary re-renders
   return {
