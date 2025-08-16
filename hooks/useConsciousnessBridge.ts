@@ -201,17 +201,27 @@ export function useConsciousnessBridge() {
           
           // Test backend connection with timeout
           try {
+            console.log('🔍 Testing backend connection...');
             const backendHealthy = await testBackendConnection();
             if (!backendHealthy) {
               console.warn('⚠️ Backend not responding, switching to offline mode');
-              setState(prev => ({ ...prev, offlineMode: true }));
+              console.log('💡 Tip: Make sure the backend server is running on the correct port');
+              setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
             } else {
-              console.log('✅ Backend connection established');
+              console.log('✅ Backend connection established successfully');
               setState(prev => ({ ...prev, offlineMode: false, isConnected: true }));
             }
           } catch (error) {
-            console.error('❌ Backend connection test failed:', error);
-            setState(prev => ({ ...prev, offlineMode: true }));
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('❌ Backend connection test failed:', errorMessage);
+            
+            if (errorMessage.includes('timeout')) {
+              console.log('⏰ Connection timed out - backend server may not be running');
+            } else if (errorMessage.includes('fetch')) {
+              console.log('🌐 Network error - check backend server accessibility');
+            }
+            
+            setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
           }
         }
       } catch (error) {
@@ -343,6 +353,15 @@ export function useConsciousnessBridge() {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Consciousness sync failed:', errorMessage);
       
+      // Provide more specific error information
+      if (errorMessage.includes('timeout')) {
+        console.log('⏰ Sync timed out - backend may be overloaded or unreachable');
+      } else if (errorMessage.includes('fetch')) {
+        console.log('🌐 Network error during sync - check connectivity');
+      } else if (errorMessage.includes('500')) {
+        console.log('🔧 Backend server error - check server logs');
+      }
+      
       // Always switch to offline mode on any error
       setState(prev => ({ 
         ...prev, 
@@ -397,7 +416,16 @@ export function useConsciousnessBridge() {
     
     // Handle field query errors
     if (fieldQuery.error) {
-      console.error('❌ Field query failed:', fieldQuery.error.message);
+      const errorMessage = fieldQuery.error.message;
+      console.error('❌ Field query failed:', errorMessage);
+      
+      // Provide specific error context
+      if (errorMessage.includes('timeout')) {
+        console.log('⏰ Field query timed out - backend may be slow');
+      } else if (errorMessage.includes('fetch')) {
+        console.log('🌐 Network error in field query - connectivity issue');
+      }
+      
       setState(prev => ({ 
         ...prev, 
         isConnected: false,
@@ -426,9 +454,11 @@ export function useConsciousnessBridge() {
         return false;
       }
       console.log('✅ Backend connection verified');
+      setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
       return true;
     } catch (error) {
-      console.error('❌ Connection test failed:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('❌ Connection test failed:', errorMessage);
       setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
       return false;
     }

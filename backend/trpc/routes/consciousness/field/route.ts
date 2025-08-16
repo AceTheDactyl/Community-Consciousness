@@ -368,7 +368,8 @@ export default publicProcedure
         cacheEnabled: true,
         spatialIndexEnabled: true,
         calculationComplexity: 'O(n log n)'
-      };
+      }
+    };
     } catch (error) {
       console.error('❌ Field calculation error:', error);
       

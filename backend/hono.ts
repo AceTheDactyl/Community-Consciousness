@@ -54,16 +54,37 @@ app.use(
 // Simple health check endpoint
 app.get("/", (c) => {
   try {
-    const stats = wsManager.getStats();
-    return c.json({ 
+    // Basic health check without websocket dependency
+    const response: any = { 
       status: "ok", 
       message: "Consciousness Field API is running",
       timestamp: new Date().toISOString(),
-      websocket: {
+      version: "1.0.0",
+      endpoints: {
+        health: "/api",
+        test: "/api/test",
+        trpc: "/api/trpc",
+        websocket: "/api/ws"
+      }
+    };
+    
+    // Try to get websocket stats, but don't fail if it errors
+    try {
+      const stats = wsManager.getStats();
+      response.websocket = {
         endpoint: "/api/ws",
         ...stats
-      }
-    });
+      };
+    } catch (wsError) {
+      console.warn('WebSocket stats unavailable:', wsError);
+      response.websocket = {
+        endpoint: "/api/ws",
+        status: "unavailable",
+        error: wsError instanceof Error ? wsError.message : 'Unknown error'
+      };
+    }
+    
+    return c.json(response);
   } catch (error) {
     console.error('Health check error:', error);
     return c.json({ 
@@ -81,7 +102,11 @@ app.get("/test", (c) => {
     message: "Backend is working!",
     timestamp: new Date().toISOString(),
     cors: "enabled",
-    trpc: "mounted at /api/trpc"
+    trpc: "mounted at /api/trpc",
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || '8081'
+    }
   });
 });
 
