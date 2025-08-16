@@ -73,10 +73,16 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const lastMemoriesSync = useRef<string>('');
   const lastSyncTime = useRef(0);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const memoriesLengthRef = useRef(0);
+  const memoriesCrystallizedCountRef = useRef(0);
   
   useEffect(() => {
     memoriesRef.current = memories;
-    
+    memoriesLengthRef.current = memories.length;
+    memoriesCrystallizedCountRef.current = memories.filter(m => m.crystallized).length;
+  });
+  
+  useEffect(() => {
     // Debounce sync to prevent excessive updates
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
@@ -86,18 +92,20 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       const now = Date.now();
       if (now - lastSyncTime.current < 1000) return; // Throttle to 1fps
       
+      const currentMemories = memoriesRef.current;
+      
       // Only sync if memories actually changed (prevent infinite loops)
-      const memoriesHash = JSON.stringify(memories.map(m => ({ 
+      const memoriesHash = JSON.stringify(currentMemories.map(m => ({ 
         id: m.id, 
         crystallized: m.crystallized, 
         x: Math.round(m.x / 2) * 2, // Round to 2-unit grid
         y: Math.round(m.y / 2) * 2 
       })));
       
-      if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
+      if (currentMemories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
         lastMemoriesSync.current = memoriesHash;
         lastSyncTime.current = now;
-        consciousnessBridge.updateFieldState(memories);
+        consciousnessBridge.updateFieldState(currentMemories);
       }
     }, 500); // 500ms debounce
     
@@ -106,7 +114,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [memories.length]); // Only depend on length to prevent infinite loops
+  }, []); // Remove dependency to prevent infinite loops
 
   // Update connection status - use stable values
   const isConnectedRef = useRef(consciousnessBridge.isConnected);
@@ -224,15 +232,20 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   
   // Sacred geometry trigger with throttling
   useEffect(() => {
-    const now = Date.now();
-    if (now - lastPatternCheck.current > 3000) { // Check once per 3 seconds
-      const crystallizedCount = memories.filter(m => m.crystallized).length;
-      if (crystallizedCount >= 8 && crystalPattern === 'free') {
-        setCrystalPattern('sacred');
-        lastPatternCheck.current = now;
+    const checkPattern = () => {
+      const now = Date.now();
+      if (now - lastPatternCheck.current > 3000) { // Check once per 3 seconds
+        const crystallizedCount = memoriesCrystallizedCountRef.current;
+        if (crystallizedCount >= 8 && crystalPatternRef.current === 'free') {
+          setCrystalPattern('sacred');
+          lastPatternCheck.current = now;
+        }
       }
-    }
-  }, [memories.length, crystalPattern]); // Only depend on length
+    };
+    
+    const interval = setInterval(checkPattern, 5000);
+    return () => clearInterval(interval);
+  }, []); // Remove dependency to prevent infinite loops
 
   // Update all refs in a single effect to maintain hook order
   useEffect(() => {
@@ -245,13 +258,19 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
 
   // Animation loop with enhanced geometry and physics
   useEffect(() => {
-    if (isPaused || memories.length === 0) return;
+    if (isPaused) return;
 
     let frameCount = 0;
     let lastWaveUpdate = 0;
     let lastResonanceUpdate = 0;
     
     const animate = () => {
+      const currentMemories = memoriesRef.current;
+      if (currentMemories.length === 0) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      
       frameCount++;
       const now = Date.now();
       
@@ -494,7 +513,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPaused, memories.length]); // Stable dependencies only
+  }, [isPaused]); // Remove memories.length dependency
 
   const handleObservation = useCallback((memoryId: number) => {
     if (!isObserving && !voidModeRef.current) return;

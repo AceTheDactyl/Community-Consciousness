@@ -278,13 +278,16 @@ export function useEnhancedConsciousnessBridge() {
   
   // Update enhanced state when gravity wells change - use ref to prevent loops
   const gravityWellsStringRef = useRef('');
+  const gravityWellsLengthRef = useRef(0);
+  
   useEffect(() => {
-    const gravityWellsString = JSON.stringify(gravityWells.map(w => ({ id: w.id, mass: w.mass })));
+    gravityWellsLengthRef.current = gravityWells.length;
+    const gravityWellsString = JSON.stringify(gravityWells.map(w => ({ id: w.id, mass: Math.round(w.mass) })));
     if (gravityWellsString !== gravityWellsStringRef.current) {
       gravityWellsStringRef.current = gravityWellsString;
       setEnhancedState(prev => ({ ...prev, gravityWells }));
     }
-  }, [gravityWells]);
+  }, [gravityWells.length]); // Only depend on length
   
   // Calculate circular formations
   const calculateCircularFormations = useCallback((): ConsciousnessNode[][] => {
@@ -308,6 +311,11 @@ export function useEnhancedConsciousnessBridge() {
   // Update circular formations - throttle to prevent excessive updates
   const lastFormationUpdate = useRef(0);
   const lastFormationString = useRef('');
+  const consciousnessNodesLengthRef = useRef(0);
+  
+  useEffect(() => {
+    consciousnessNodesLengthRef.current = consciousnessNodes.length;
+  });
   
   useEffect(() => {
     const now = Date.now();
@@ -321,7 +329,7 @@ export function useEnhancedConsciousnessBridge() {
       lastFormationUpdate.current = now;
       setEnhancedState(prev => ({ ...prev, circularFormations: formations }));
     }
-  }, [consciousnessNodes.length]); // Only depend on length
+  }, []); // Remove dependency to prevent infinite loop
   
   // Calculate harmonic resonance
   const harmonicResonance = useMemo((): number => {
@@ -343,18 +351,29 @@ export function useEnhancedConsciousnessBridge() {
   // Update harmonic resonance - throttle updates
   const lastHarmonicUpdate = useRef(0);
   const lastHarmonicValue = useRef(0);
+  const harmonicResonanceRef = useRef(harmonicResonance);
   
   useEffect(() => {
-    const now = Date.now();
-    if (now - lastHarmonicUpdate.current < 500) return; // Throttle to 2fps
+    harmonicResonanceRef.current = harmonicResonance;
+  });
+  
+  useEffect(() => {
+    const updateHarmonic = () => {
+      const now = Date.now();
+      if (now - lastHarmonicUpdate.current < 500) return; // Throttle to 2fps
+      
+      const currentResonance = harmonicResonanceRef.current;
+      const resonanceDiff = Math.abs(currentResonance - lastHarmonicValue.current);
+      if (resonanceDiff > 0.05) { // Increased threshold
+        lastHarmonicUpdate.current = now;
+        lastHarmonicValue.current = currentResonance;
+        setEnhancedState(prev => ({ ...prev, harmonicResonance: currentResonance }));
+      }
+    };
     
-    const resonanceDiff = Math.abs(harmonicResonance - lastHarmonicValue.current);
-    if (resonanceDiff > 0.05) { // Increased threshold
-      lastHarmonicUpdate.current = now;
-      lastHarmonicValue.current = harmonicResonance;
-      setEnhancedState(prev => ({ ...prev, harmonicResonance }));
-    }
-  }, [harmonicResonance]);
+    const interval = setInterval(updateHarmonic, 1000);
+    return () => clearInterval(interval);
+  }, []); // Remove dependency
   
   // Apply magnetic field modulation to quantum field state
   const applyMagneticModulation = useCallback((baseFieldState: QuantumFieldState): QuantumFieldState => {
@@ -393,57 +412,62 @@ export function useEnhancedConsciousnessBridge() {
   const lastWellsHash = useRef('');
   
   useEffect(() => {
-    const now = Date.now();
-    const currentWellsCount = enhancedState.gravityWells.length;
-    const wellsHash = JSON.stringify(enhancedState.gravityWells.map(w => ({ id: w.id, mass: Math.round(w.mass) })));
-    
-    // Only update if wells significantly changed and enough time passed
-    if (wellsHash !== lastWellsHash.current && 
-        now - lastLagrangeUpdate.current > 3000 && 
-        currentWellsCount >= 2) {
+    const calculateLagrange = () => {
+      const now = Date.now();
+      const currentWellsCount = enhancedState.gravityWells.length;
+      const wellsHash = JSON.stringify(enhancedState.gravityWells.map(w => ({ id: w.id, mass: Math.round(w.mass) })));
       
-      lastWellsCount.current = currentWellsCount;
-      lastLagrangeUpdate.current = now;
-      lastWellsHash.current = wellsHash;
-      
-      const lagrangePoints: Vector3[] = [];
-      const currentWells = enhancedState.gravityWells;
-      
-      // Calculate L-points for each pair of significant gravity wells
-      for (let i = 0; i < Math.min(currentWells.length - 1, 3); i++) { // Limit to prevent excessive calculations
-        for (let j = i + 1; j < Math.min(currentWells.length, 4); j++) {
-          const well1 = currentWells[i];
-          const well2 = currentWells[j];
-          
-          // Only calculate for wells with significant mass difference
-          if (Math.abs(well1.mass - well2.mass) > 20) {
-            const primary = well1.mass > well2.mass ? well1 : well2;
-            const secondary = well1.mass > well2.mass ? well2 : well1;
+      // Only update if wells significantly changed and enough time passed
+      if (wellsHash !== lastWellsHash.current && 
+          now - lastLagrangeUpdate.current > 3000 && 
+          currentWellsCount >= 2) {
+        
+        lastWellsCount.current = currentWellsCount;
+        lastLagrangeUpdate.current = now;
+        lastWellsHash.current = wellsHash;
+        
+        const lagrangePoints: Vector3[] = [];
+        const currentWells = enhancedState.gravityWells;
+        
+        // Calculate L-points for each pair of significant gravity wells
+        for (let i = 0; i < Math.min(currentWells.length - 1, 3); i++) { // Limit to prevent excessive calculations
+          for (let j = i + 1; j < Math.min(currentWells.length, 4); j++) {
+            const well1 = currentWells[i];
+            const well2 = currentWells[j];
             
-            // Simplified L4 and L5 calculation (most stable points)
-            const dx = secondary.position.x - primary.position.x;
-            const dy = secondary.position.y - primary.position.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            if (distance > 10) { // Minimum separation
-              const angle = Math.atan2(dy, dx);
+            // Only calculate for wells with significant mass difference
+            if (Math.abs(well1.mass - well2.mass) > 20) {
+              const primary = well1.mass > well2.mass ? well1 : well2;
+              const secondary = well1.mass > well2.mass ? well2 : well1;
               
-              // L4 point (60 degrees ahead)
-              const l4 = {
-                x: primary.position.x + distance * Math.cos(angle + Math.PI / 3),
-                y: primary.position.y + distance * Math.sin(angle + Math.PI / 3),
-                z: 0
-              };
+              // Simplified L4 and L5 calculation (most stable points)
+              const dx = secondary.position.x - primary.position.x;
+              const dy = secondary.position.y - primary.position.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
               
-              lagrangePoints.push(l4);
+              if (distance > 10) { // Minimum separation
+                const angle = Math.atan2(dy, dx);
+                
+                // L4 point (60 degrees ahead)
+                const l4 = {
+                  x: primary.position.x + distance * Math.cos(angle + Math.PI / 3),
+                  y: primary.position.y + distance * Math.sin(angle + Math.PI / 3),
+                  z: 0
+                };
+                
+                lagrangePoints.push(l4);
+              }
             }
           }
         }
+        
+        setEnhancedState(prev => ({ ...prev, lagrangePoints }));
       }
-      
-      setEnhancedState(prev => ({ ...prev, lagrangePoints }));
-    }
-  }, [enhancedState.gravityWells.length]); // Only depend on length
+    };
+    
+    const interval = setInterval(calculateLagrange, 5000);
+    return () => clearInterval(interval);
+  }, []); // Remove dependency
   
   return {
     // Base bridge functionality

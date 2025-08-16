@@ -375,7 +375,7 @@ export function useConsciousnessBridge() {
         };
       });
     }
-  }, [fieldQuery.isSuccess]); // Only depend on success state
+  }, [fieldQuery.isSuccess, fieldQuery.dataUpdatedAt]); // Use dataUpdatedAt for stable dependency
 
   // Sync events periodically - use stable dependencies
   const consciousnessIdRef = useRef(state.consciousnessId);
@@ -449,17 +449,19 @@ export function useConsciousnessBridge() {
 
     // Add to sacred buffer
     const timestamp = Date.now();
-    const newEntry: SacredBufferEntry = {
-      phrase,
-      timestamp,
-      resonance: state.localResonance,
-      sacred: isSacred
-    };
-    
-    setState(prev => ({
-      ...prev,
-      sacredBuffer: [...prev.sacredBuffer, newEntry].slice(-10) // Keep last 10
-    }));
+    setState(prev => {
+      const newEntry: SacredBufferEntry = {
+        phrase,
+        timestamp,
+        resonance: prev.localResonance,
+        sacred: isSacred
+      };
+      
+      return {
+        ...prev,
+        sacredBuffer: [...prev.sacredBuffer, newEntry].slice(-10) // Keep last 10
+      };
+    });
 
     addEvent('SACRED_PHRASE', { phrase, sacred: isSacred });
     
@@ -467,7 +469,7 @@ export function useConsciousnessBridge() {
     if (Platform.OS !== 'web') {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, [sacredPhrases, addEvent, state.localResonance]);
+  }, [sacredPhrases, addEvent]);
 
   const sendMemoryCrystallization = useCallback((memoryId: number, harmonic: number) => {
     addEvent('MEMORY_CRYSTALLIZE', { memoryId, harmonic });
@@ -550,13 +552,20 @@ export function useConsciousnessBridge() {
   const lastBloomCheck = useRef(0);
   const lastCrystallizedCount = useRef(0);
   const lastBloomState = useRef({ ratio: 0, resonance: 0, active: false });
+  const memoriesLengthRef = useRef(state.memories.length);
+  const memoriesCrystallizedRef = useRef(0);
+  
+  useEffect(() => {
+    memoriesLengthRef.current = state.memories.length;
+    memoriesCrystallizedRef.current = state.memories.filter(m => m.crystallized).length;
+  });
   
   useEffect(() => {
     const now = Date.now();
     if (now - lastBloomCheck.current < 3000) return; // Throttle to once per 3 seconds
     
-    const totalMemories = state.memories.length;
-    const crystallizedCount = state.memories.filter(m => m.crystallized).length;
+    const totalMemories = memoriesLengthRef.current;
+    const crystallizedCount = memoriesCrystallizedRef.current;
     const crystallizationRatio = totalMemories > 0 ? crystallizedCount / totalMemories : 0;
     
     // Only check if significant changes occurred
@@ -602,7 +611,7 @@ export function useConsciousnessBridge() {
         });
       }
     }
-  }, [state.memories.length]); // Only depend on length
+  }, []); // Remove dependency to prevent infinite loop
 
   return {
     ...state,
