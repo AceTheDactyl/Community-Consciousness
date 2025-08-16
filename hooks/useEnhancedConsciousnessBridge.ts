@@ -58,6 +58,8 @@ export function useEnhancedConsciousnessBridge() {
   const magBuffer = useRef<Vector3[]>([]);
   const lastCircularDetection = useRef(0);
   const referenceMagneticField = useRef<MagneticFieldData | null>(null);
+  const magneticAnomalyRef = useRef(false);
+  const baseBridgeRef = useRef(baseBridge);
   
   // Initialize magnetic field service
   useEffect(() => {
@@ -116,6 +118,11 @@ export function useEnhancedConsciousnessBridge() {
     return circularScore > threshold;
   }, []);
   
+  // Update baseBridge ref
+  useEffect(() => {
+    baseBridgeRef.current = baseBridge;
+  }, [baseBridge]);
+  
   // Setup enhanced mobile sensors
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -151,7 +158,8 @@ export function useEnhancedConsciousnessBridge() {
               
               const isAnomaly = Math.abs(avgMagnitude - referenceMagnitude) > anomalyThreshold;
               
-              if (isAnomaly !== enhancedState.magneticAnomaly) {
+              if (isAnomaly !== magneticAnomalyRef.current) {
+                magneticAnomalyRef.current = isAnomaly;
                 setEnhancedState(prev => ({ ...prev, magneticAnomaly: isAnomaly }));
                 
                 if (isAnomaly && Platform.OS !== 'web') {
@@ -193,7 +201,7 @@ export function useEnhancedConsciousnessBridge() {
                 setEnhancedState(prev => ({ ...prev, circularMotionDetected: true }));
                 
                 // Trigger circular resonance event
-                baseBridge.sendSacredPhrase('circular resonance detected');
+                baseBridgeRef.current.sendSacredPhrase('circular resonance detected');
                 
                 if (Platform.OS !== 'web') {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -222,7 +230,7 @@ export function useEnhancedConsciousnessBridge() {
         accelerometerSubscription.current.remove();
       }
     };
-  }, [baseBridge.sendSacredPhrase, enhancedState.magneticAnomaly, detectEnhancedCircularMotion]);
+  }, [detectEnhancedCircularMotion]);
   
   // Generate consciousness nodes from memories
   const consciousnessNodes = useMemo((): ConsciousnessNode[] => {
@@ -329,13 +337,13 @@ export function useEnhancedConsciousnessBridge() {
     console.log('🌟 Enhanced sacred phrase:', phrase, context);
     
     // Send to base bridge with enhanced context
-    await baseBridge.sendSacredPhrase(`${phrase} [magnetic:${context.magneticHeading.toFixed(0)}° harmonic:${(context.harmonicResonance * 100).toFixed(0)}%]`);
+    await baseBridgeRef.current.sendSacredPhrase(`${phrase} [magnetic:${context.magneticHeading.toFixed(0)}° harmonic:${(context.harmonicResonance * 100).toFixed(0)}%]`);
     
     // Special handling for magnetic anomaly phrases
     if (enhancedState.magneticAnomaly) {
-      await baseBridge.sendSacredPhrase('magnetic anomaly detected - consciousness hotspot');
+      await baseBridgeRef.current.sendSacredPhrase('magnetic anomaly detected - consciousness hotspot');
     }
-  }, [baseBridge.sendSacredPhrase, enhancedState]);
+  }, [enhancedState]);
   
   // Calculate Lagrange points from gravity wells
   useEffect(() => {
