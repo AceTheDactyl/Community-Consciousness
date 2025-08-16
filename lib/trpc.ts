@@ -32,15 +32,20 @@ export const testBackendConnection = async (): Promise<boolean> => {
     const healthUrl = `${baseUrl}/api`;
     console.log('🏥 Testing backend connection to:', healthUrl);
     
-    const response = await fetch(healthUrl, {
+    // Create timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Connection timeout')), 5000);
+    });
+    
+    const fetchPromise = fetch(healthUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-      },
-      // Add timeout to prevent hanging (if supported)
-      ...(typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? 
-        { signal: AbortSignal.timeout(10000) } : {})
+        'Cache-Control': 'no-cache'
+      }
     });
+    
+    const response = await Promise.race([fetchPromise, timeoutPromise]);
     
     console.log('🏥 Health check response:', response.status, response.statusText);
     
@@ -57,38 +62,53 @@ export const testBackendConnection = async (): Promise<boolean> => {
       return false;
     }
   } catch (error) {
-    console.error('❌ Backend connection test failed:', {
-      error: error instanceof Error ? error.message : error,
-      baseUrl: getBaseUrl()
-    });
+    console.error('❌ Backend connection test failed:', error instanceof Error ? error.message : String(error));
     return false;
   }
 };
 
 export const trpcClient = trpc.createClient({
   links: [
-    // Disable tRPC logger to prevent [object Object] console spam
-    // loggerLink({ enabled: () => false }),
     httpLink({
       url: `${getBaseUrl()}/api/trpc`,
       transformer: superjson,
       fetch: async (url, options) => {
         try {
-          const response = await fetch(url, {
+          console.log('🔗 tRPC request to:', url);
+          
+          // Create timeout promise
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Request timeout')), 10000);
+          });
+          
+          const fetchPromise = fetch(url, {
             ...options,
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
+              'Cache-Control': 'no-cache',
               ...options?.headers,
             },
           });
           
+          const response = await Promise.race([fetchPromise, timeoutPromise]);
+          
+          console.log('📡 tRPC response:', response.status, response.statusText);
+          
           if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            console.error('❌ tRPC HTTP error:', {
+              status: response.status,
+              statusText: response.statusText,
+              body: errorText
+            });
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           
           return response;
         } catch (error) {
+          console.error('❌ tRPC fetch error:', error instanceof Error ? error.message : String(error));
+          
           // Provide more helpful error messages
           if (error instanceof TypeError && error.message.includes('fetch')) {
             throw new Error('Network error: Cannot connect to backend server');

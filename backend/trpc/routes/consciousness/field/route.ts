@@ -78,11 +78,17 @@ class FieldCache {
   }
   
   generateKey(nodes: any[], phase: number, resonance: number): string {
-    const nodeHash = nodes
-      .map(n => `${n.x},${n.y},${n.harmonic.toFixed(2)}`)
-      .sort()
-      .join('|');
-    return `${nodeHash}:${phase.toFixed(3)}:${resonance.toFixed(3)}`;
+    try {
+      const nodeHash = nodes
+        .filter(n => n && typeof n.x === 'number' && typeof n.y === 'number' && typeof n.harmonic === 'number')
+        .map(n => `${n.x.toFixed(2)},${n.y.toFixed(2)},${n.harmonic.toFixed(2)}`)
+        .sort()
+        .join('|');
+      return `${nodeHash}:${phase.toFixed(3)}:${resonance.toFixed(3)}`;
+    } catch (error) {
+      console.error('Error generating cache key:', error);
+      return `fallback:${Date.now()}:${Math.random()}`;
+    }
   }
 }
 
@@ -364,7 +370,7 @@ export default publicProcedure
         calculationComplexity: 'O(n log n)'
       }
     };
-  } catch (error) {
+    } catch (error) {
       console.error('❌ Field calculation error:', error);
       
       // Return safe fallback response

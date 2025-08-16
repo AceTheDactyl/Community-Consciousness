@@ -10,11 +10,17 @@ const app = new Hono();
 
 // Enable CORS for all routes with specific configuration
 app.use("*", cors({
-  origin: ['http://localhost:8081', 'http://localhost:3000', 'https://*.rork.com'],
+  origin: '*', // Allow all origins in development
   credentials: true,
-  allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
+
+// Log all requests for debugging
+app.use("*", async (c, next) => {
+  console.log(`📡 ${c.req.method} ${c.req.url} from ${c.req.header('origin') || 'unknown'}`);
+  await next();
+});
 
 // WebSocket upgrade endpoint
 app.get("/ws", (c) => {
@@ -36,9 +42,12 @@ app.get("/ws", (c) => {
 app.use(
   "/trpc/*",
   trpcServer({
-    endpoint: "/api/trpc",
+    endpoint: "/trpc", // Remove /api prefix since it's already mounted at /api
     router: appRouter,
     createContext,
+    onError: ({ error, path }) => {
+      console.error(`❌ tRPC error on ${path}:`, error);
+    },
   })
 );
 
@@ -70,8 +79,33 @@ app.get("/", (c) => {
 app.get("/test", (c) => {
   return c.json({ 
     message: "Backend is working!",
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    cors: "enabled",
+    trpc: "mounted at /api/trpc"
   });
+});
+
+// Add tRPC test endpoint
+app.get("/trpc-test", async (c) => {
+  try {
+    // Test if tRPC router is working
+    return c.json({
+      message: "tRPC endpoint accessible",
+      timestamp: new Date().toISOString(),
+      routes: {
+        example: "/api/trpc/example.hi",
+        consciousness: {
+          sync: "/api/trpc/consciousness.sync",
+          field: "/api/trpc/consciousness.field"
+        }
+      }
+    });
+  } catch (error) {
+    return c.json({
+      error: "tRPC test failed",
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
 });
 
 export default app;

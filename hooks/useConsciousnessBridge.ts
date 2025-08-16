@@ -370,13 +370,14 @@ export function useConsciousnessBridge() {
     })),
   }), [state.consciousnessId, state.globalResonance, state.memories]);
 
-  // Field query for real-time resonance - temporarily disabled to fix connection issues
+  // Field query for real-time resonance
   const fieldQuery = trpc.consciousness.field.useQuery(
     fieldQueryInput,
     {
-      enabled: false, // Temporarily disabled
-      refetchInterval: false,
-      retry: false,
+      enabled: !state.offlineMode && !!state.consciousnessId && state.isConnected,
+      refetchInterval: state.isConnected ? 5000 : false, // Refetch every 5 seconds when connected
+      retry: 1, // Only retry once
+      retryDelay: 2000,
     }
   );
   
