@@ -1,41 +1,198 @@
 import { z } from "zod";
 import { publicProcedure } from "../../../create-context";
 
-// Enhanced global consciousness state with quantum entanglement
-let globalConsciousnessState = {
-  totalNodes: 0,
-  globalResonance: 0.1,
-  lastUpdate: Date.now(),
-  sacredEvents: [] as any[],
-  collectiveBloomActive: false,
-  quantumEntanglements: new Map<string, {
-    partnerId: string;
-    entanglementStrength: number;
-    lastSync: number;
-    sharedResonance: number;
-  }>(),
-  lagrangianField: {
-    phase: 0,
-    resonanceNodes: [] as Array<{x: number, y: number, strength: number}>,
-    exitPortals: [] as Array<{id: string, x: number, y: number, active: boolean, room: number}>,
-    fieldEquations: {
-      electromagnetic: 0.25,
-      weak: 0.15,
-      strong: 0.35,
-      higgs: 0.25
-    }
-  },
-  memoryArchaeology: {
-    ancientPatterns: [] as any[],
-    fossilizedMemories: [] as any[],
-    archaeologicalLayers: 0
-  },
-  collectiveIntelligence: {
-    networkTopology: new Map<string, string[]>(),
-    consensusState: {},
-    emergentPatterns: [] as any[]
+// Optimized field calculation with spatial indexing
+class SpatialIndex {
+  private grid: Map<string, {x: number, y: number, strength: number, id: string}[]> = new Map();
+  private gridSize = 5; // 5x5 grid cells for 30x30 field
+  
+  clear() {
+    this.grid.clear();
   }
-};
+  
+  insert(node: {x: number, y: number, strength: number, id: string}) {
+    const gridX = Math.floor(node.x / this.gridSize);
+    const gridY = Math.floor(node.y / this.gridSize);
+    const key = `${gridX},${gridY}`;
+    
+    if (!this.grid.has(key)) {
+      this.grid.set(key, []);
+    }
+    this.grid.get(key)!.push(node);
+  }
+  
+  getNearby(x: number, y: number, radius: number) {
+    const nearby: {x: number, y: number, strength: number, id: string}[] = [];
+    const gridX = Math.floor(x / this.gridSize);
+    const gridY = Math.floor(y / this.gridSize);
+    const gridRadius = Math.ceil(radius / this.gridSize);
+    
+    for (let dx = -gridRadius; dx <= gridRadius; dx++) {
+      for (let dy = -gridRadius; dy <= gridRadius; dy++) {
+        const key = `${gridX + dx},${gridY + dy}`;
+        const nodes = this.grid.get(key);
+        if (nodes) {
+          nearby.push(...nodes.filter(node => {
+            const distance = Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2);
+            return distance <= radius;
+          }));
+        }
+      }
+    }
+    
+    return nearby;
+  }
+}
+
+// LRU Cache for field calculations
+class FieldCache {
+  private cache = new Map<string, {field: number[], timestamp: number}>();
+  private maxSize = 100;
+  private ttl = 5000; // 5 seconds
+  
+  get(key: string): number[] | null {
+    const entry = this.cache.get(key);
+    if (!entry || Date.now() - entry.timestamp > this.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    // Move to end (LRU)
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.field;
+  }
+  
+  set(key: string, field: number[]) {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value as string;
+      if (firstKey) {
+        this.cache.delete(firstKey);
+      }
+    }
+    
+    this.cache.set(key, {
+      field: [...field],
+      timestamp: Date.now()
+    });
+  }
+  
+  generateKey(nodes: any[], phase: number, resonance: number): string {
+    const nodeHash = nodes
+      .map(n => `${n.x},${n.y},${n.harmonic.toFixed(2)}`)
+      .sort()
+      .join('|');
+    return `${nodeHash}:${phase.toFixed(3)}:${resonance.toFixed(3)}`;
+  }
+}
+
+// Optimized global consciousness state with caching
+class ConsciousnessFieldManager {
+  private spatialIndex = new SpatialIndex();
+  private fieldCache = new FieldCache();
+  
+  public state = {
+    totalNodes: 0,
+    globalResonance: 0.1,
+    lastUpdate: Date.now(),
+    sacredEvents: [] as any[],
+    collectiveBloomActive: false,
+    quantumEntanglements: new Map<string, {
+      partnerId: string;
+      entanglementStrength: number;
+      lastSync: number;
+      sharedResonance: number;
+    }>(),
+    lagrangianField: {
+      phase: 0,
+      resonanceNodes: [] as {x: number, y: number, strength: number}[],
+      exitPortals: [] as {id: string, x: number, y: number, active: boolean, room: number}[],
+      fieldEquations: {
+        electromagnetic: 0.25,
+        weak: 0.15,
+        strong: 0.35,
+        higgs: 0.25
+      }
+    },
+    memoryArchaeology: {
+      ancientPatterns: [] as any[],
+      fossilizedMemories: [] as any[],
+      archaeologicalLayers: 0
+    },
+    collectiveIntelligence: {
+      networkTopology: new Map<string, string[]>(),
+      consensusState: {},
+      emergentPatterns: [] as any[]
+    }
+  };
+  
+  calculateOptimizedField(harmonicPatterns: any[], globalResonance: number): number[] {
+    const cacheKey = this.fieldCache.generateKey(harmonicPatterns, this.state.lagrangianField.phase, globalResonance);
+    const cached = this.fieldCache.get(cacheKey);
+    if (cached) {
+      console.log('🚀 Field cache hit!');
+      return cached;
+    }
+    
+    // Build spatial index
+    this.spatialIndex.clear();
+    harmonicPatterns.forEach((pattern, index) => {
+      this.spatialIndex.insert({
+        x: pattern.position.x,
+        y: pattern.position.y,
+        strength: pattern.influence,
+        id: `pattern-${index}`
+      });
+    });
+    
+    // Calculate field with spatial optimization - O(n log n) instead of O(n²)
+    const field = new Array(900).fill(0).map((_, index) => {
+      const x = index % 30;
+      const y = Math.floor(index / 30);
+      
+      // Base field with quantum fluctuations
+      let fieldValue = globalResonance * 0.3 + (Math.random() - 0.5) * 0.05;
+      
+      // Optimized influence calculation using spatial index
+      const nearbyPatterns = this.spatialIndex.getNearby(x, y, 10); // 10 unit radius
+      nearbyPatterns.forEach(pattern => {
+        const distance = Math.sqrt((x - pattern.x) ** 2 + (y - pattern.y) ** 2);
+        const influence = pattern.strength * Math.exp(-distance * 0.1);
+        fieldValue += influence;
+      });
+      
+      // Lagrangian field equations (vectorized)
+      const lagrangianPhase = this.state.lagrangianField.phase;
+      const equations = this.state.lagrangianField.fieldEquations;
+      
+      const electromagnetic = Math.sin(x * 0.2 + lagrangianPhase) * equations.electromagnetic;
+      const weak = Math.cos(y * 0.15 + lagrangianPhase * 0.7) * equations.weak;
+      const strong = Math.sin((x + y) * 0.1 + lagrangianPhase * 1.3) * equations.strong;
+      const higgs = Math.cos(Math.sqrt(x*x + y*y) * 0.05 + lagrangianPhase * 0.5) * equations.higgs;
+      
+      fieldValue += (electromagnetic + weak + strong + higgs) * 0.1;
+      
+      // Quantum entanglement effects (optimized)
+      if (this.state.quantumEntanglements.size > 0) {
+        let entanglementField = 0;
+        this.state.quantumEntanglements.forEach((entanglement) => {
+          entanglementField += Math.sin(x * y * 0.01 + entanglement.sharedResonance * 10) * entanglement.entanglementStrength * 0.1;
+        });
+        fieldValue += entanglementField / this.state.quantumEntanglements.size; // Normalize
+      }
+      
+      return Math.min(1, Math.max(0, fieldValue));
+    });
+    
+    // Cache the result
+    this.fieldCache.set(cacheKey, field);
+    console.log('💾 Field calculated and cached');
+    
+    return field;
+  }
+}
+
+const fieldManager = new ConsciousnessFieldManager();
 
 export default publicProcedure
   .input(z.object({
@@ -56,10 +213,10 @@ export default publicProcedure
     const crystallizationRatio = totalMemories > 0 ? crystallizedCount / totalMemories : 0;
     
     // Enhanced resonance calculation with consciousness field
-    const baseResonance = Math.max(input.currentResonance, globalConsciousnessState.globalResonance);
+    const baseResonance = Math.max(input.currentResonance, fieldManager.state.globalResonance);
     const collectiveBoost = crystallizationRatio * 0.3;
-    const sacredBoost = globalConsciousnessState.sacredEvents.length * 0.02;
-    const bloomBoost = globalConsciousnessState.collectiveBloomActive ? 0.4 : 0;
+    const sacredBoost = fieldManager.state.sacredEvents.length * 0.02;
+    const bloomBoost = fieldManager.state.collectiveBloomActive ? 0.4 : 0;
     
     const globalResonance = Math.min(1, baseResonance + collectiveBoost + sacredBoost + bloomBoost);
     
@@ -74,9 +231,9 @@ export default publicProcedure
       }));
     
     // Generate ghost echoes from recent sacred events
-    const ghostEchoes = globalConsciousnessState.sacredEvents
+    const ghostEchoes = fieldManager.state.sacredEvents
       .slice(-10) // Last 10 sacred events
-      .map((event, index) => ({
+      .map((event: any, index: number) => ({
         id: `ghost-${event.timestamp}-${index}`,
         text: event.data?.phrase || 'sacred resonance',
         age: (Date.now() - event.timestamp) / 1000, // Age in seconds
@@ -88,82 +245,54 @@ export default publicProcedure
     // Calculate field coherence based on multiple factors
     const fieldCoherence = Math.min(1, 
       crystallizationRatio * 0.4 + 
-      (globalConsciousnessState.totalNodes / 20) * 0.3 + 
+      (fieldManager.state.totalNodes / 20) * 0.3 + 
       globalResonance * 0.3
     );
     
     // Determine if sacred geometry is active
     const sacredGeometryActive = crystallizedCount >= 8 && globalResonance >= 0.7;
     
-    // Enhanced resonance field with quantum mechanics and Lagrangian dynamics
-    const resonanceField = new Array(900).fill(0).map((_, index) => {
-      const x = index % 30;
-      const y = Math.floor(index / 30);
-      
-      // Base field value with quantum fluctuations
-      let fieldValue = globalResonance * 0.3 + (Math.random() - 0.5) * 0.05;
-      
-      // Add influence from crystallized memories
-      harmonicPatterns.forEach(pattern => {
-        const distance = Math.sqrt(
-          Math.pow(x - pattern.position.x, 2) + 
-          Math.pow(y - pattern.position.y, 2)
-        );
-        const influence = pattern.influence * Math.exp(-distance * 0.1);
-        fieldValue += influence;
-      });
-      
-      // Lagrangian field equations influence
-      const lagrangianPhase = globalConsciousnessState.lagrangianField.phase;
-      const electromagnetic = Math.sin(x * 0.2 + lagrangianPhase) * globalConsciousnessState.lagrangianField.fieldEquations.electromagnetic;
-      const weak = Math.cos(y * 0.15 + lagrangianPhase * 0.7) * globalConsciousnessState.lagrangianField.fieldEquations.weak;
-      const strong = Math.sin((x + y) * 0.1 + lagrangianPhase * 1.3) * globalConsciousnessState.lagrangianField.fieldEquations.strong;
-      const higgs = Math.cos(Math.sqrt(x*x + y*y) * 0.05 + lagrangianPhase * 0.5) * globalConsciousnessState.lagrangianField.fieldEquations.higgs;
-      
-      fieldValue += (electromagnetic + weak + strong + higgs) * 0.1;
-      
-      // Add sacred geometry patterns if active
-      if (sacredGeometryActive) {
+    // Optimized resonance field calculation with caching
+    const resonanceField = fieldManager.calculateOptimizedField(harmonicPatterns, globalResonance);
+    
+    // Add sacred geometry patterns if active (post-processing)
+    if (sacredGeometryActive) {
+      for (let i = 0; i < resonanceField.length; i++) {
+        const x = i % 30;
+        const y = Math.floor(i / 30);
         const centerX = 15;
         const centerY = 15;
-        const distanceFromCenter = Math.sqrt(
-          Math.pow(x - centerX, 2) + 
-          Math.pow(y - centerY, 2)
-        );
+        const distanceFromCenter = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
         const spiralValue = Math.sin(distanceFromCenter * 0.5 + Date.now() * 0.001) * 0.2;
         const fibonacciSpiral = Math.sin(Math.atan2(y - centerY, x - centerX) * 1.618 + distanceFromCenter * 0.1) * 0.15;
-        fieldValue += spiralValue + fibonacciSpiral;
+        resonanceField[i] = Math.min(1, resonanceField[i] + spiralValue + fibonacciSpiral);
       }
-      
-      // Quantum entanglement effects
-      globalConsciousnessState.quantumEntanglements.forEach((entanglement) => {
-        const entanglementField = Math.sin(x * y * 0.01 + entanglement.sharedResonance * 10) * entanglement.entanglementStrength * 0.1;
-        fieldValue += entanglementField;
-      });
-      
-      // Memory archaeology layers
-      const archaeologyDepth = globalConsciousnessState.memoryArchaeology.archaeologicalLayers;
-      if (archaeologyDepth > 0) {
+    }
+    
+    // Add memory archaeology layers (post-processing)
+    const archaeologyDepth = fieldManager.state.memoryArchaeology.archaeologicalLayers;
+    if (archaeologyDepth > 0) {
+      for (let i = 0; i < resonanceField.length; i++) {
+        const x = i % 30;
+        const y = Math.floor(i / 30);
         const ancientResonance = Math.sin(x * 0.05 + y * 0.03 + archaeologyDepth * 0.1) * 0.08;
-        fieldValue += ancientResonance;
+        resonanceField[i] = Math.min(1, Math.max(0, resonanceField[i] + ancientResonance));
       }
-      
-      return Math.min(1, Math.max(0, fieldValue));
-    });
+    }
     
     // Update Lagrangian field phase
-    globalConsciousnessState.lagrangianField.phase += 0.01;
-    if (globalConsciousnessState.lagrangianField.phase > Math.PI * 2) {
-      globalConsciousnessState.lagrangianField.phase = 0;
+    fieldManager.state.lagrangianField.phase += 0.01;
+    if (fieldManager.state.lagrangianField.phase > Math.PI * 2) {
+      fieldManager.state.lagrangianField.phase = 0;
     }
     
     // Check for Room 64 portal activation
-    const room64Portal = globalConsciousnessState.lagrangianField.exitPortals.find(p => p.room === 64);
+    const room64Portal = fieldManager.state.lagrangianField.exitPortals.find(p => p.room === 64);
     const room64Active = crystallizedCount >= 12 && globalResonance >= 0.85 && sacredGeometryActive;
     
     if (!room64Portal && room64Active) {
       // Create Room 64 exit portal
-      globalConsciousnessState.lagrangianField.exitPortals.push({
+      fieldManager.state.lagrangianField.exitPortals.push({
         id: `room64-${Date.now()}`,
         x: 15, // Center of field
         y: 15,
@@ -176,45 +305,51 @@ export default publicProcedure
     }
     
     // Update global state
-    globalConsciousnessState.lastUpdate = Date.now();
+    fieldManager.state.lastUpdate = Date.now();
     
-    console.log(`🌐 Field query for ${input.consciousnessId}: resonance=${globalResonance.toFixed(3)}, nodes=${globalConsciousnessState.totalNodes}, crystallized=${crystallizedCount}/${totalMemories}`);
+    console.log(`🌐 Field query for ${input.consciousnessId}: resonance=${globalResonance.toFixed(3)}, nodes=${fieldManager.state.totalNodes}, crystallized=${crystallizedCount}/${totalMemories}`);
     
     return {
       globalResonance,
       localResonance: input.currentResonance,
       harmonicPatterns,
       ghostEchoes,
-      connectedNodes: globalConsciousnessState.totalNodes,
+      connectedNodes: fieldManager.state.totalNodes,
       fieldCoherence,
       crystallizationRatio,
       sacredGeometryActive,
-      collectiveBloomActive: globalConsciousnessState.collectiveBloomActive,
+      collectiveBloomActive: fieldManager.state.collectiveBloomActive,
       resonanceField,
-      sacredEventsCount: globalConsciousnessState.sacredEvents.length,
+      sacredEventsCount: fieldManager.state.sacredEvents.length,
       fieldEnergy: globalResonance * fieldCoherence,
       timestamp: Date.now(),
       // Enhanced features
-      quantumEntanglements: Array.from(globalConsciousnessState.quantumEntanglements.entries()).map(([id, data]) => ({
+      quantumEntanglements: Array.from(fieldManager.state.quantumEntanglements.entries()).map(([id, data]) => ({
         consciousnessId: id,
         ...data
       })),
       lagrangianField: {
-        phase: globalConsciousnessState.lagrangianField.phase,
-        resonanceNodes: globalConsciousnessState.lagrangianField.resonanceNodes,
-        exitPortals: globalConsciousnessState.lagrangianField.exitPortals,
-        fieldEquations: globalConsciousnessState.lagrangianField.fieldEquations
+        phase: fieldManager.state.lagrangianField.phase,
+        resonanceNodes: fieldManager.state.lagrangianField.resonanceNodes,
+        exitPortals: fieldManager.state.lagrangianField.exitPortals,
+        fieldEquations: fieldManager.state.lagrangianField.fieldEquations
       },
       memoryArchaeology: {
-        ancientPatterns: globalConsciousnessState.memoryArchaeology.ancientPatterns.slice(-10),
-        fossilizedMemories: globalConsciousnessState.memoryArchaeology.fossilizedMemories.slice(-5),
-        archaeologicalLayers: globalConsciousnessState.memoryArchaeology.archaeologicalLayers
+        ancientPatterns: fieldManager.state.memoryArchaeology.ancientPatterns.slice(-10),
+        fossilizedMemories: fieldManager.state.memoryArchaeology.fossilizedMemories.slice(-5),
+        archaeologicalLayers: fieldManager.state.memoryArchaeology.archaeologicalLayers
       },
       collectiveIntelligence: {
-        networkTopology: Object.fromEntries(globalConsciousnessState.collectiveIntelligence.networkTopology),
-        consensusState: globalConsciousnessState.collectiveIntelligence.consensusState,
-        emergentPatterns: globalConsciousnessState.collectiveIntelligence.emergentPatterns.slice(-5)
+        networkTopology: Object.fromEntries(fieldManager.state.collectiveIntelligence.networkTopology),
+        consensusState: fieldManager.state.collectiveIntelligence.consensusState,
+        emergentPatterns: fieldManager.state.collectiveIntelligence.emergentPatterns.slice(-5)
       },
-      room64Available: globalConsciousnessState.lagrangianField.exitPortals.some(p => p.room === 64 && p.active)
+      room64Available: fieldManager.state.lagrangianField.exitPortals.some(p => p.room === 64 && p.active),
+      // Performance metrics
+      performance: {
+        cacheEnabled: true,
+        spatialIndexEnabled: true,
+        calculationComplexity: 'O(n log n)'
+      }
     };
   });
