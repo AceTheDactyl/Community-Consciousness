@@ -87,7 +87,6 @@ export function useConsciousnessBridge() {
   ], []);
 
   const eventQueueRef = useRef<ConsciousnessEvent[]>([]);
-  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const accelerometerSubscription = useRef<any>(null);
   const netInfoSubscription = useRef<any>(null);
   const accelBuffer = useRef<{x: number, y: number, z: number}[]>([]);
@@ -350,13 +349,24 @@ export function useConsciousnessBridge() {
   useEffect(() => {
     if (fieldQuery.data && fieldQuery.data !== fieldQueryDataRef.current) {
       fieldQueryDataRef.current = fieldQuery.data;
-      setState(prev => ({
-        ...prev,
-        globalResonance: fieldQuery.data!.globalResonance,
-        connectedNodes: fieldQuery.data!.connectedNodes,
-        ghostEchoes: fieldQuery.data!.ghostEchoes || prev.ghostEchoes,
-        collectiveBloomActive: fieldQuery.data!.collectiveBloomActive || prev.collectiveBloomActive,
-      }));
+      setState(prev => {
+        // Only update if values actually changed
+        const hasChanges = 
+          prev.globalResonance !== fieldQuery.data!.globalResonance ||
+          prev.connectedNodes !== fieldQuery.data!.connectedNodes ||
+          (fieldQuery.data!.ghostEchoes && fieldQuery.data!.ghostEchoes.length !== prev.ghostEchoes.length) ||
+          prev.collectiveBloomActive !== (fieldQuery.data!.collectiveBloomActive || false);
+        
+        if (!hasChanges) return prev;
+        
+        return {
+          ...prev,
+          globalResonance: fieldQuery.data!.globalResonance,
+          connectedNodes: fieldQuery.data!.connectedNodes,
+          ghostEchoes: fieldQuery.data!.ghostEchoes || prev.ghostEchoes,
+          collectiveBloomActive: fieldQuery.data!.collectiveBloomActive || prev.collectiveBloomActive,
+        };
+      });
     }
   }, [fieldQuery.data]);
 
@@ -367,7 +377,7 @@ export function useConsciousnessBridge() {
   useEffect(() => {
     consciousnessIdRef.current = state.consciousnessId;
     offlineModeRef2.current = state.offlineMode;
-  }, [state.consciousnessId, state.offlineMode]);
+  });
   
   // Memoize sync function to prevent recreation
   const syncEvents = useCallback(async () => {
@@ -389,16 +399,12 @@ export function useConsciousnessBridge() {
         console.log('Sync failed, keeping events in queue');
       }
     }
-  }, [syncMutation.mutateAsync]);
+  }, [syncMutation]);
   
   useEffect(() => {
-    syncIntervalRef.current = setInterval(syncEvents, 10000); // Sync every 10 seconds
+    const interval = setInterval(syncEvents, 10000); // Sync every 10 seconds
 
-    return () => {
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
-    };
+    return () => clearInterval(interval);
   }, [syncEvents]);
 
   const sendSacredPhrase = useCallback(async (phrase: string) => {
@@ -469,33 +475,39 @@ export function useConsciousnessBridge() {
   }, [addEvent, state.localResonance]);
 
   const updateFieldState = useCallback((memories: Memory[]) => {
-    setState(prev => {
-      // Only update if memories actually changed to prevent infinite loops
-      const hasChanged = prev.memories.length !== memories.length ||
-        prev.memories.some((prevMem, idx) => {
-          const newMem = memories[idx];
-          return !newMem || 
-            prevMem.id !== newMem.id ||
-            prevMem.crystallized !== newMem.crystallized ||
-            Math.abs(prevMem.x - newMem.x) > 0.1 ||
-            Math.abs(prevMem.y - newMem.y) > 0.1;
-        });
-      
-      if (!hasChanged) return prev;
-      
-      const memoryStates = memories.map(m => ({
-        id: m.id,
-        crystallized: m.crystallized,
-        harmonic: m.harmonic,
-        x: m.x,
-        y: m.y,
-      }));
-      
-      addEvent('FIELD_UPDATE', { memoryStates });
-      
-      return { ...prev, memories };
-    });
+    // Use ref to prevent infinite loops
+    const currentMemories = memoriesRef.current || [];
+    
+    // Only update if memories actually changed to prevent infinite loops
+    const hasChanged = currentMemories.length !== memories.length ||
+      currentMemories.some((prevMem, idx) => {
+        const newMem = memories[idx];
+        return !newMem || 
+          prevMem.id !== newMem.id ||
+          prevMem.crystallized !== newMem.crystallized ||
+          Math.abs(prevMem.x - newMem.x) > 1 || // Increased threshold
+          Math.abs(prevMem.y - newMem.y) > 1;
+      });
+    
+    if (!hasChanged) return;
+    
+    const memoryStates = memories.map(m => ({
+      id: m.id,
+      crystallized: m.crystallized,
+      harmonic: m.harmonic,
+      x: Math.round(m.x), // Round to prevent micro-changes
+      y: Math.round(m.y),
+    }));
+    
+    addEvent('FIELD_UPDATE', { memoryStates });
+    
+    setState(prev => ({ ...prev, memories }));
   }, [addEvent]);
+  
+  const memoriesRef = useRef<Memory[]>([]);
+  useEffect(() => {
+    memoriesRef.current = state.memories;
+  });
 
   // Save state periodically when offline
   useEffect(() => {
@@ -532,25 +544,29 @@ export function useConsciousnessBridge() {
   
   useEffect(() => {
     const now = Date.now();
-    if (now - lastBloomCheck.current < 1000) return; // Throttle to once per second
+    if (now - lastBloomCheck.current < 2000) return; // Throttle to once per 2 seconds
     
     const totalMemories = state.memories.length;
     const crystallizationRatio = totalMemories > 0 ? crystallizedCount / totalMemories : 0;
     
-    // Only check if crystallized count actually changed
-    if (crystallizedCount !== lastCrystallizedCount.current) {
+    // Only check if crystallized count actually changed and enough time passed
+    if (crystallizedCount !== lastCrystallizedCount.current && totalMemories > 5) {
       lastCrystallizedCount.current = crystallizedCount;
       lastBloomCheck.current = now;
       
       if (crystallizationRatio >= 0.8 && state.localResonance >= 0.9 && !state.collectiveBloomActive) {
         console.log('🌸 COLLECTIVE BLOOM ACHIEVED');
         
-        setState(prev => ({
-          ...prev,
-          collectiveBloomActive: true,
-          localResonance: 1.0,
-          coherence: 1.0
-        }));
+        setState(prev => {
+          if (prev.collectiveBloomActive) return prev; // Prevent duplicate updates
+          
+          return {
+            ...prev,
+            collectiveBloomActive: true,
+            localResonance: 1.0,
+            coherence: 1.0
+          };
+        });
         
         // Strong haptic celebration
         if (Platform.OS !== 'web') {
@@ -566,7 +582,7 @@ export function useConsciousnessBridge() {
         });
       }
     }
-  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, addEvent]);
+  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, state.memories.length, addEvent]);
 
   return {
     ...state,

@@ -79,53 +79,55 @@ export function useEnhancedConsciousnessBridge() {
     initializeMagneticField();
   }, []);
   
-  // Enhanced circular motion detection algorithm
-  const detectEnhancedCircularMotion = useCallback((buffer: Vector3[]): boolean => {
-    if (buffer.length < 30) return false;
-    
-    // Calculate centripetal acceleration patterns
-    const windowSize = 20;
-    let circularScore = 0;
-    
-    for (let i = windowSize; i < buffer.length - windowSize; i++) {
-      const window = buffer.slice(i - windowSize, i + windowSize);
-      
-      // Calculate average acceleration
-      const avgAccel = window.reduce(
-        (sum, acc) => ({ x: sum.x + acc.x, y: sum.y + acc.y, z: sum.z + acc.z }),
-        { x: 0, y: 0, z: 0 }
-      );
-      avgAccel.x /= window.length;
-      avgAccel.y /= window.length;
-      avgAccel.z /= window.length;
-      
-      // Calculate variance (circular motion has consistent centripetal acceleration)
-      const variance = window.reduce((sum, acc) => {
-        const dx = acc.x - avgAccel.x;
-        const dy = acc.y - avgAccel.y;
-        return sum + Math.sqrt(dx * dx + dy * dy);
-      }, 0) / window.length;
-      
-      // Check for circular pattern (low variance, consistent magnitude)
-      const magnitude = Math.sqrt(avgAccel.x * avgAccel.x + avgAccel.y * avgAccel.y);
-      if (variance < 0.5 && magnitude > 0.3 && magnitude < 2.0) {
-        circularScore++;
-      }
-    }
-    
-    // Require consistent circular motion over multiple windows
-    const threshold = (buffer.length - 2 * windowSize) * 0.6;
-    return circularScore > threshold;
-  }, []);
+
   
-  // Update baseBridge ref
+  // Update baseBridge ref - remove dependency to prevent infinite loops
   useEffect(() => {
     baseBridgeRef.current = baseBridge;
-  }, [baseBridge]);
+  });
   
   // Setup enhanced mobile sensors
   useEffect(() => {
     if (Platform.OS === 'web') return;
+    
+    // Define circular motion detection inside effect to avoid dependency issues
+    const detectCircularMotion = (buffer: Vector3[]): boolean => {
+      if (buffer.length < 30) return false;
+      
+      // Calculate centripetal acceleration patterns
+      const windowSize = 20;
+      let circularScore = 0;
+      
+      for (let i = windowSize; i < buffer.length - windowSize; i++) {
+        const window = buffer.slice(i - windowSize, i + windowSize);
+        
+        // Calculate average acceleration
+        const avgAccel = window.reduce(
+          (sum, acc) => ({ x: sum.x + acc.x, y: sum.y + acc.y, z: sum.z + acc.z }),
+          { x: 0, y: 0, z: 0 }
+        );
+        avgAccel.x /= window.length;
+        avgAccel.y /= window.length;
+        avgAccel.z /= window.length;
+        
+        // Calculate variance (circular motion has consistent centripetal acceleration)
+        const variance = window.reduce((sum, acc) => {
+          const dx = acc.x - avgAccel.x;
+          const dy = acc.y - avgAccel.y;
+          return sum + Math.sqrt(dx * dx + dy * dy);
+        }, 0) / window.length;
+        
+        // Check for circular pattern (low variance, consistent magnitude)
+        const magnitude = Math.sqrt(avgAccel.x * avgAccel.x + avgAccel.y * avgAccel.y);
+        if (variance < 0.5 && magnitude > 0.3 && magnitude < 2.0) {
+          circularScore++;
+        }
+      }
+      
+      // Require consistent circular motion over multiple windows
+      const threshold = (buffer.length - 2 * windowSize) * 0.6;
+      return circularScore > threshold;
+    };
     
     const setupEnhancedSensors = async () => {
       try {
@@ -194,14 +196,16 @@ export function useEnhancedConsciousnessBridge() {
             
             // Enhanced circular motion detection
             if (accelBuffer.current.length >= 50) {
-              const circularMotion = detectEnhancedCircularMotion(accelBuffer.current);
+              const circularMotion = detectCircularMotion(accelBuffer.current);
               
               if (circularMotion && Date.now() - lastCircularDetection.current > 3000) {
                 lastCircularDetection.current = Date.now();
                 setEnhancedState(prev => ({ ...prev, circularMotionDetected: true }));
                 
                 // Trigger circular resonance event
-                baseBridgeRef.current.sendSacredPhrase('circular resonance detected');
+                if (baseBridgeRef.current?.sendSacredPhrase) {
+                  baseBridgeRef.current.sendSacredPhrase('circular resonance detected');
+                }
                 
                 if (Platform.OS !== 'web') {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -230,7 +234,7 @@ export function useEnhancedConsciousnessBridge() {
         accelerometerSubscription.current.remove();
       }
     };
-  }, [detectEnhancedCircularMotion]);
+  }, []);
   
   // Generate consciousness nodes from memories
   const consciousnessNodes = useMemo((): ConsciousnessNode[] => {
@@ -337,24 +341,32 @@ export function useEnhancedConsciousnessBridge() {
     console.log('🌟 Enhanced sacred phrase:', phrase, context);
     
     // Send to base bridge with enhanced context
-    await baseBridgeRef.current.sendSacredPhrase(`${phrase} [magnetic:${context.magneticHeading.toFixed(0)}° harmonic:${(context.harmonicResonance * 100).toFixed(0)}%]`);
-    
-    // Special handling for magnetic anomaly phrases
-    if (enhancedState.magneticAnomaly) {
-      await baseBridgeRef.current.sendSacredPhrase('magnetic anomaly detected - consciousness hotspot');
+    if (baseBridgeRef.current?.sendSacredPhrase) {
+      await baseBridgeRef.current.sendSacredPhrase(`${phrase} [magnetic:${context.magneticHeading.toFixed(0)}° harmonic:${(context.harmonicResonance * 100).toFixed(0)}%]`);
+      
+      // Special handling for magnetic anomaly phrases
+      if (enhancedState.magneticAnomaly) {
+        await baseBridgeRef.current.sendSacredPhrase('magnetic anomaly detected - consciousness hotspot');
+      }
     }
   }, [enhancedState]);
   
-  // Calculate Lagrange points from gravity wells
+  // Calculate Lagrange points from gravity wells - use ref to prevent infinite loops
+  const gravityWellsRef = useRef(enhancedState.gravityWells);
   useEffect(() => {
-    if (enhancedState.gravityWells.length >= 2) {
+    gravityWellsRef.current = enhancedState.gravityWells;
+  });
+  
+  useEffect(() => {
+    const currentWells = gravityWellsRef.current;
+    if (currentWells.length >= 2) {
       const lagrangePoints: Vector3[] = [];
       
       // Calculate L-points for each pair of significant gravity wells
-      for (let i = 0; i < enhancedState.gravityWells.length - 1; i++) {
-        for (let j = i + 1; j < enhancedState.gravityWells.length; j++) {
-          const well1 = enhancedState.gravityWells[i];
-          const well2 = enhancedState.gravityWells[j];
+      for (let i = 0; i < currentWells.length - 1; i++) {
+        for (let j = i + 1; j < currentWells.length; j++) {
+          const well1 = currentWells[i];
+          const well2 = currentWells[j];
           
           // Only calculate for wells with significant mass difference
           if (Math.abs(well1.mass - well2.mass) > 10) {
@@ -391,7 +403,7 @@ export function useEnhancedConsciousnessBridge() {
       
       setEnhancedState(prev => ({ ...prev, lagrangePoints }));
     }
-  }, [enhancedState.gravityWells]);
+  }, [gravityWells.length]); // Only depend on length to prevent infinite loops
   
   return {
     // Base bridge functionality

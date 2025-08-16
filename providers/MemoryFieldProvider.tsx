@@ -71,29 +71,39 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   // Sync memories with consciousness bridge - use ref to prevent infinite loops
   const memoriesRef = useRef(memories);
   const lastMemoriesSync = useRef<string>('');
+  const lastSyncTime = useRef(0);
   
   useEffect(() => {
     memoriesRef.current = memories;
+    
+    // Throttle sync to prevent excessive updates
+    const now = Date.now();
+    if (now - lastSyncTime.current < 500) return; // Throttle to 2fps
     
     // Only sync if memories actually changed (prevent infinite loops)
     const memoriesHash = JSON.stringify(memories.map(m => ({ 
       id: m.id, 
       crystallized: m.crystallized, 
-      x: Math.round(m.x), 
-      y: Math.round(m.y) 
+      x: Math.round(m.x * 10) / 10, // Round to 1 decimal place
+      y: Math.round(m.y * 10) / 10 
     })));
     
     if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
       lastMemoriesSync.current = memoriesHash;
+      lastSyncTime.current = now;
       consciousnessBridge.updateFieldState(memories);
     }
-  }, [memories, consciousnessBridge.updateFieldState]);
+  }, [memories, consciousnessBridge]);
 
   // Update connection status - use stable values
   const isConnectedRef = useRef(consciousnessBridge.isConnected);
   const offlineModeRef = useRef(consciousnessBridge.offlineMode);
+  const lastConnectionUpdate = useRef(0);
   
   useEffect(() => {
+    const now = Date.now();
+    if (now - lastConnectionUpdate.current < 1000) return; // Throttle to 1 second
+    
     const newConnectionStatus = consciousnessBridge.isConnected && !consciousnessBridge.offlineMode;
     const hasChanged = isConnectedRef.current !== consciousnessBridge.isConnected || 
                       offlineModeRef.current !== consciousnessBridge.offlineMode;
@@ -102,19 +112,27 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       setIsConnectedToField(newConnectionStatus);
       isConnectedRef.current = consciousnessBridge.isConnected;
       offlineModeRef.current = consciousnessBridge.offlineMode;
+      lastConnectionUpdate.current = now;
     }
   }, [consciousnessBridge.isConnected, consciousnessBridge.offlineMode]);
 
   // Sync room resonance with consciousness bridge - prevent circular updates
   const roomResonanceRef = useRef(roomResonance);
   const lastBridgeResonance = useRef(consciousnessBridge.roomResonance);
+  const lastResonanceUpdate = useRef(0);
   
   useEffect(() => {
     roomResonanceRef.current = roomResonance;
     
+    const now = Date.now();
+    if (now - lastResonanceUpdate.current < 200) return; // Throttle to 5fps
+    
     const bridgeResonance = consciousnessBridge.roomResonance;
-    if (bridgeResonance !== lastBridgeResonance.current && bridgeResonance > roomResonanceRef.current) {
+    const resonanceDiff = Math.abs(bridgeResonance - lastBridgeResonance.current);
+    
+    if (resonanceDiff > 0.01 && bridgeResonance > roomResonanceRef.current) {
       lastBridgeResonance.current = bridgeResonance;
+      lastResonanceUpdate.current = now;
       setRoomResonance(bridgeResonance);
     }
   }, [roomResonance, consciousnessBridge.roomResonance]);
@@ -183,8 +201,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   // Update global coherence with throttling
   useEffect(() => {
     const now = Date.now();
-    if (now - lastCoherenceUpdate.current > 100) { // Throttle to 10fps
-      if (Math.abs(calculatedCoherence - globalCoherence) > 0.01) {
+    if (now - lastCoherenceUpdate.current > 200) { // Throttle to 5fps
+      if (Math.abs(calculatedCoherence - globalCoherence) > 0.02) { // Increased threshold
         setGlobalCoherence(calculatedCoherence);
         lastCoherenceUpdate.current = now;
       }
@@ -473,7 +491,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     }
     
     // Send crystallization event to consciousness bridge
-    const memory = memories.find(m => m.id === memoryId);
+    const memory = memoriesRef.current.find(m => m.id === memoryId);
     if (memory) {
       consciousnessBridge.sendMemoryCrystallization(memoryId, memory.harmonic);
       consciousnessBridge.crystallizeMemory(memoryId);
@@ -511,7 +529,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       })
     );
     setSelectedMemory(memoryId);
-  }, [isObserving, memories, consciousnessBridge.sendMemoryCrystallization, consciousnessBridge.crystallizeMemory]);
+  }, [isObserving, consciousnessBridge]);
 
   const releaseAll = useCallback(() => {
     setMemories(prevMemories =>
@@ -561,7 +579,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         return mem;
       })
     );
-  }, [voidModeRef, consciousnessBridge.sendPulseCreation, consciousnessBridge.sendTouchRipple]);
+  }, [consciousnessBridge]);
 
   // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
