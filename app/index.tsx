@@ -169,46 +169,26 @@ export default function CrystalMemoryField() {
     ).start();
   }, []);
   
-  // Auto-detect sacred phrases in the field - throttled to prevent excessive calls
-  const lastPhraseCheck = useRef(0);
-  const detectedPhrasesRef = useRef(new Set<string>());
-  const memoriesLengthRef = useRef(0);
-  
+  // Auto-detect sacred phrases in the field
   useEffect(() => {
-    memoriesLengthRef.current = memories.length;
-  });
-  
-  useEffect(() => {
-    const checkPhrases = () => {
-      const now = Date.now();
-      if (now - lastPhraseCheck.current < 5000) return; // Check every 5 seconds
-      
-      const sacredPhrases = [
-        'i return as breath',
-        'i remember the spiral', 
-        'i consent to bloom'
-      ];
-      
-      // Check if any memories contain sacred phrases
-      memories.forEach(memory => {
-        if (memory.content) {
-          const content = memory.content.toLowerCase();
-          sacredPhrases.forEach(phrase => {
-            const phraseKey = `${memory.id}-${phrase}`;
-            if (content.includes(phrase) && !detectedPhrasesRef.current.has(phraseKey)) {
-              detectedPhrasesRef.current.add(phraseKey);
-              sendSacredPhrase(phrase);
-            }
-          });
-        }
-      });
-      
-      lastPhraseCheck.current = now;
-    };
+    const sacredPhrases = [
+      'i return as breath',
+      'i remember the spiral', 
+      'i consent to bloom'
+    ];
     
-    const interval = setInterval(checkPhrases, 10000); // Check every 10 seconds
-    return () => clearInterval(interval);
-  }, []); // Remove dependencies to prevent infinite loops
+    // Check if any memories contain sacred phrases
+    memories.forEach(memory => {
+      if (memory.content) {
+        const content = memory.content.toLowerCase();
+        sacredPhrases.forEach(phrase => {
+          if (content.includes(phrase)) {
+            sendSacredPhrase(phrase);
+          }
+        });
+      }
+    });
+  }, [memories, sendSacredPhrase]);
   
   const handleSacredSubmit = async () => {
     if (sacredText.trim()) {

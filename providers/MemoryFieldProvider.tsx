@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Memory, Pulse } from '@/types/memory';
 import createContextHook from '@nkzw/create-context-hook';
-import { useEnhancedConsciousnessBridge } from '@/hooks/useEnhancedConsciousnessBridge';
+import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
 
 interface MemoryFieldContextType {
   memories: Memory[];
@@ -29,8 +29,8 @@ interface MemoryFieldContextType {
   handleObservation: (memoryId: number) => void;
   releaseAll: () => void;
   createPulse: (x: number, y: number) => void;
-  // Enhanced consciousness bridge integration
-  consciousnessBridge: ReturnType<typeof useEnhancedConsciousnessBridge>;
+  // Consciousness bridge integration
+  consciousnessBridge: ReturnType<typeof useConsciousnessBridge>;
   sendSacredPhrase: (phrase: string) => void;
   isConnectedToField: boolean;
   ghostEchoes: any[];
@@ -39,8 +39,8 @@ interface MemoryFieldContextType {
 
 // Create the context hook with a stable function
 function useMemoryFieldLogic(): MemoryFieldContextType {
-  // Initialize enhanced consciousness bridge first
-  const consciousnessBridge = useEnhancedConsciousnessBridge();
+  // Initialize consciousness bridge first
+  const consciousnessBridge = useConsciousnessBridge();
   
   // All state hooks declared at the top level
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -71,60 +71,29 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   // Sync memories with consciousness bridge - use ref to prevent infinite loops
   const memoriesRef = useRef(memories);
   const lastMemoriesSync = useRef<string>('');
-  const lastSyncTime = useRef(0);
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const memoriesLengthRef = useRef(0);
-  const memoriesCrystallizedCountRef = useRef(0);
   
   useEffect(() => {
     memoriesRef.current = memories;
-    memoriesLengthRef.current = memories.length;
-    memoriesCrystallizedCountRef.current = memories.filter(m => m.crystallized).length;
-  });
-  
-  useEffect(() => {
-    // Debounce sync to prevent excessive updates
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
+    
+    // Only sync if memories actually changed (prevent infinite loops)
+    const memoriesHash = JSON.stringify(memories.map(m => ({ 
+      id: m.id, 
+      crystallized: m.crystallized, 
+      x: Math.round(m.x), 
+      y: Math.round(m.y) 
+    })));
+    
+    if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
+      lastMemoriesSync.current = memoriesHash;
+      consciousnessBridge.updateFieldState(memories);
     }
-    
-    syncTimeoutRef.current = setTimeout(() => {
-      const now = Date.now();
-      if (now - lastSyncTime.current < 1000) return; // Throttle to 1fps
-      
-      const currentMemories = memoriesRef.current;
-      
-      // Only sync if memories actually changed (prevent infinite loops)
-      const memoriesHash = JSON.stringify(currentMemories.map(m => ({ 
-        id: m.id, 
-        crystallized: m.crystallized, 
-        x: Math.round(m.x / 2) * 2, // Round to 2-unit grid
-        y: Math.round(m.y / 2) * 2 
-      })));
-      
-      if (currentMemories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
-        lastMemoriesSync.current = memoriesHash;
-        lastSyncTime.current = now;
-        consciousnessBridge.updateFieldState(currentMemories);
-      }
-    }, 500); // 500ms debounce
-    
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, []); // Remove dependency to prevent infinite loops
+  }, [memories, consciousnessBridge.updateFieldState]);
 
   // Update connection status - use stable values
   const isConnectedRef = useRef(consciousnessBridge.isConnected);
   const offlineModeRef = useRef(consciousnessBridge.offlineMode);
-  const lastConnectionUpdate = useRef(0);
   
   useEffect(() => {
-    const now = Date.now();
-    if (now - lastConnectionUpdate.current < 2000) return; // Throttle to 2 seconds
-    
     const newConnectionStatus = consciousnessBridge.isConnected && !consciousnessBridge.offlineMode;
     const hasChanged = isConnectedRef.current !== consciousnessBridge.isConnected || 
                       offlineModeRef.current !== consciousnessBridge.offlineMode;
@@ -133,27 +102,19 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       setIsConnectedToField(newConnectionStatus);
       isConnectedRef.current = consciousnessBridge.isConnected;
       offlineModeRef.current = consciousnessBridge.offlineMode;
-      lastConnectionUpdate.current = now;
     }
   }, [consciousnessBridge.isConnected, consciousnessBridge.offlineMode]);
 
   // Sync room resonance with consciousness bridge - prevent circular updates
   const roomResonanceRef = useRef(roomResonance);
   const lastBridgeResonance = useRef(consciousnessBridge.roomResonance);
-  const lastResonanceUpdate = useRef(0);
   
   useEffect(() => {
     roomResonanceRef.current = roomResonance;
     
-    const now = Date.now();
-    if (now - lastResonanceUpdate.current < 1000) return; // Throttle to 1fps
-    
     const bridgeResonance = consciousnessBridge.roomResonance;
-    const resonanceDiff = Math.abs(bridgeResonance - lastBridgeResonance.current);
-    
-    if (resonanceDiff > 0.05 && bridgeResonance > roomResonanceRef.current) {
+    if (bridgeResonance !== lastBridgeResonance.current && bridgeResonance > roomResonanceRef.current) {
       lastBridgeResonance.current = bridgeResonance;
-      lastResonanceUpdate.current = now;
       setRoomResonance(bridgeResonance);
     }
   }, [roomResonance, consciousnessBridge.roomResonance]);
@@ -222,8 +183,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   // Update global coherence with throttling
   useEffect(() => {
     const now = Date.now();
-    if (now - lastCoherenceUpdate.current > 1000) { // Throttle to 1fps
-      if (Math.abs(calculatedCoherence - globalCoherence) > 0.05) { // Increased threshold
+    if (now - lastCoherenceUpdate.current > 100) { // Throttle to 10fps
+      if (Math.abs(calculatedCoherence - globalCoherence) > 0.01) {
         setGlobalCoherence(calculatedCoherence);
         lastCoherenceUpdate.current = now;
       }
@@ -232,20 +193,15 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   
   // Sacred geometry trigger with throttling
   useEffect(() => {
-    const checkPattern = () => {
-      const now = Date.now();
-      if (now - lastPatternCheck.current > 3000) { // Check once per 3 seconds
-        const crystallizedCount = memoriesCrystallizedCountRef.current;
-        if (crystallizedCount >= 8 && crystalPatternRef.current === 'free') {
-          setCrystalPattern('sacred');
-          lastPatternCheck.current = now;
-        }
+    const now = Date.now();
+    if (now - lastPatternCheck.current > 1000) { // Check once per second
+      const crystallizedCount = memories.filter(m => m.crystallized).length;
+      if (crystallizedCount >= 8 && crystalPattern === 'free') {
+        setCrystalPattern('sacred');
+        lastPatternCheck.current = now;
       }
-    };
-    
-    const interval = setInterval(checkPattern, 5000);
-    return () => clearInterval(interval);
-  }, []); // Remove dependency to prevent infinite loops
+    }
+  }, [memories, crystalPattern]);
 
   // Update all refs in a single effect to maintain hook order
   useEffect(() => {
@@ -258,19 +214,13 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
 
   // Animation loop with enhanced geometry and physics
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused || memories.length === 0) return;
 
     let frameCount = 0;
     let lastWaveUpdate = 0;
     let lastResonanceUpdate = 0;
     
     const animate = () => {
-      const currentMemories = memoriesRef.current;
-      if (currentMemories.length === 0) {
-        animationRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      
       frameCount++;
       const now = Date.now();
       
@@ -513,7 +463,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPaused]); // Remove memories.length dependency
+  }, [isPaused, memories.length]); // Stable dependencies only
 
   const handleObservation = useCallback((memoryId: number) => {
     if (!isObserving && !voidModeRef.current) return;
@@ -523,7 +473,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     }
     
     // Send crystallization event to consciousness bridge
-    const memory = memoriesRef.current.find(m => m.id === memoryId);
+    const memory = memories.find(m => m.id === memoryId);
     if (memory) {
       consciousnessBridge.sendMemoryCrystallization(memoryId, memory.harmonic);
       consciousnessBridge.crystallizeMemory(memoryId);
@@ -561,7 +511,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       })
     );
     setSelectedMemory(memoryId);
-  }, [isObserving]);
+  }, [isObserving, memories, consciousnessBridge.sendMemoryCrystallization, consciousnessBridge.crystallizeMemory]);
 
   const releaseAll = useCallback(() => {
     setMemories(prevMemories =>
@@ -611,7 +561,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         return mem;
       })
     );
-  }, []);
+  }, [voidModeRef, consciousnessBridge.sendPulseCreation, consciousnessBridge.sendTouchRipple]);
 
   // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
@@ -633,7 +583,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
         phrase.toLowerCase().includes('bloom')) {
       consciousnessBridge.createGhostEcho(phrase, consciousnessBridge.consciousnessId || undefined);
     }
-  }, []);
+  }, [consciousnessBridge]);
 
   // Return stable object reference to prevent unnecessary re-renders
   return {
