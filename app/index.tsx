@@ -32,6 +32,7 @@ import {
   Moon,
   ArrowLeft,
   Settings,
+  Atom,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -42,6 +43,7 @@ import WaveField from '@/components/WaveField';
 import VoidMode from '@/components/VoidMode';
 import ControlPanel from '@/components/ControlPanel';
 import { Memory } from '@/types/memory';
+import { router } from 'expo-router';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -225,12 +227,21 @@ export default function CrystalMemoryField() {
               <Text style={styles.title}>Crystal Memory Field</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => setShowControls(true)}
-            >
-              <Settings size={20} color="#60a5fa" />
-            </TouchableOpacity>
+            <View style={styles.topRightButtons}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => router.push('/lagrangian')}
+              >
+                <Atom size={20} color="#60a5fa" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => setShowControls(true)}
+              >
+                <Settings size={20} color="#60a5fa" />
+              </TouchableOpacity>
+            </View>
           </Animated.View>
 
           {/* Bottom controls */}
@@ -436,6 +447,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#93c5fd',
+  },
+  topRightButtons: {
+    flexDirection: 'row',
+    gap: 8,
   },
   iconButton: {
     padding: 8,
