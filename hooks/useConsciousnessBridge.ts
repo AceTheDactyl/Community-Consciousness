@@ -346,13 +346,20 @@ export function useConsciousnessBridge() {
   
   // Handle field query success with stable reference
   const fieldQueryDataRef = useRef(fieldQuery.data);
+  const lastFieldUpdateTime = useRef(0);
+  
   useEffect(() => {
+    const now = Date.now();
+    if (now - lastFieldUpdateTime.current < 1000) return; // Throttle to 1 second
+    
     if (fieldQuery.data && fieldQuery.data !== fieldQueryDataRef.current) {
       fieldQueryDataRef.current = fieldQuery.data;
+      lastFieldUpdateTime.current = now;
+      
       setState(prev => {
         // Only update if values actually changed
         const hasChanges = 
-          prev.globalResonance !== fieldQuery.data!.globalResonance ||
+          Math.abs(prev.globalResonance - fieldQuery.data!.globalResonance) > 0.01 ||
           prev.connectedNodes !== fieldQuery.data!.connectedNodes ||
           (fieldQuery.data!.ghostEchoes && fieldQuery.data!.ghostEchoes.length !== prev.ghostEchoes.length) ||
           prev.collectiveBloomActive !== (fieldQuery.data!.collectiveBloomActive || false);
@@ -368,7 +375,7 @@ export function useConsciousnessBridge() {
         };
       });
     }
-  }, [fieldQuery.data]);
+  }, [fieldQuery.isSuccess]); // Only depend on success state
 
   // Sync events periodically - use stable dependencies
   const consciousnessIdRef = useRef(state.consciousnessId);
@@ -474,54 +481,47 @@ export function useConsciousnessBridge() {
     addEvent('TOUCH_RIPPLE', { x, y, resonance: state.localResonance });
   }, [addEvent, state.localResonance]);
 
+  const lastFieldUpdateRef = useRef(0);
+  const lastMemoriesHashRef = useRef('');
+  
   const updateFieldState = useCallback((memories: Memory[]) => {
-    // Use ref to prevent infinite loops
-    const currentMemories = memoriesRef.current || [];
-    
-    // Throttle updates to prevent excessive calls
     const now = Date.now();
-    const lastUpdate = memoriesRef.current.length > 0 ? 
-      memoriesRef.current[0].crystallizationTime || 0 : 0;
+    if (now - lastFieldUpdateRef.current < 500) return; // Throttle to 2fps
     
-    if (now - lastUpdate < 100) return; // Throttle to 10fps
+    // Create a stable hash to detect actual changes
+    const memoriesHash = JSON.stringify(memories.map(m => ({
+      id: m.id,
+      crystallized: m.crystallized,
+      x: Math.round(m.x / 5) * 5, // Round to 5-unit grid to reduce noise
+      y: Math.round(m.y / 5) * 5
+    })));
     
-    // Only update if memories actually changed to prevent infinite loops
-    const hasChanged = currentMemories.length !== memories.length ||
-      currentMemories.some((prevMem, idx) => {
-        const newMem = memories[idx];
-        return !newMem || 
-          prevMem.id !== newMem.id ||
-          prevMem.crystallized !== newMem.crystallized ||
-          Math.abs(prevMem.x - newMem.x) > 2 || // Increased threshold
-          Math.abs(prevMem.y - newMem.y) > 2;
-      });
+    if (memoriesHash === lastMemoriesHashRef.current) return;
     
-    if (!hasChanged) return;
+    lastMemoriesHashRef.current = memoriesHash;
+    lastFieldUpdateRef.current = now;
     
     const memoryStates = memories.map(m => ({
       id: m.id,
       crystallized: m.crystallized,
       harmonic: m.harmonic,
-      x: Math.round(m.x), // Round to prevent micro-changes
+      x: Math.round(m.x),
       y: Math.round(m.y),
     }));
     
     addEvent('FIELD_UPDATE', { memoryStates });
-    
-    // Only update state if memories are different to prevent loops
-    setState(prev => {
-      if (prev.memories.length === memories.length && 
-          prev.memories.every((m, i) => m.id === memories[i]?.id)) {
-        return prev; // No change needed
-      }
-      return { ...prev, memories };
-    });
   }, [addEvent]);
   
   const memoriesRef = useRef<Memory[]>([]);
+  const lastMemoriesStructure = useRef('');
+  
   useEffect(() => {
-    memoriesRef.current = state.memories;
-  }, [state.memories.length, state.memories.filter(m => m.crystallized).length]); // Only update on structural changes
+    const structure = `${state.memories.length}-${state.memories.filter(m => m.crystallized).length}`;
+    if (structure !== lastMemoriesStructure.current) {
+      lastMemoriesStructure.current = structure;
+      memoriesRef.current = state.memories;
+    }
+  }, [state.memories.length]); // Only depend on length
 
   // Save state periodically when offline
   useEffect(() => {
@@ -549,30 +549,36 @@ export function useConsciousnessBridge() {
   // Check for collective bloom when memories change - use refs to prevent infinite loops
   const lastBloomCheck = useRef(0);
   const lastCrystallizedCount = useRef(0);
-  
-  // Memoize crystallized count to prevent unnecessary recalculations
-  const crystallizedCount = useMemo(() => 
-    state.memories.filter(m => m.crystallized).length,
-    [state.memories]
-  );
+  const lastBloomState = useRef({ ratio: 0, resonance: 0, active: false });
   
   useEffect(() => {
     const now = Date.now();
-    if (now - lastBloomCheck.current < 2000) return; // Throttle to once per 2 seconds
+    if (now - lastBloomCheck.current < 3000) return; // Throttle to once per 3 seconds
     
     const totalMemories = state.memories.length;
+    const crystallizedCount = state.memories.filter(m => m.crystallized).length;
     const crystallizationRatio = totalMemories > 0 ? crystallizedCount / totalMemories : 0;
     
-    // Only check if crystallized count actually changed and enough time passed
-    if (crystallizedCount !== lastCrystallizedCount.current && totalMemories > 5) {
+    // Only check if significant changes occurred
+    const significantChange = 
+      Math.abs(crystallizedCount - lastCrystallizedCount.current) >= 2 ||
+      Math.abs(crystallizationRatio - lastBloomState.current.ratio) > 0.1 ||
+      Math.abs(state.localResonance - lastBloomState.current.resonance) > 0.1;
+    
+    if (significantChange && totalMemories > 5) {
       lastCrystallizedCount.current = crystallizedCount;
       lastBloomCheck.current = now;
+      lastBloomState.current = { 
+        ratio: crystallizationRatio, 
+        resonance: state.localResonance, 
+        active: state.collectiveBloomActive 
+      };
       
       if (crystallizationRatio >= 0.8 && state.localResonance >= 0.9 && !state.collectiveBloomActive) {
         console.log('🌸 COLLECTIVE BLOOM ACHIEVED');
         
         setState(prev => {
-          if (prev.collectiveBloomActive) return prev; // Prevent duplicate updates
+          if (prev.collectiveBloomActive) return prev;
           
           return {
             ...prev,
@@ -592,11 +598,11 @@ export function useConsciousnessBridge() {
         addEvent('COLLECTIVE_BLOOM', { 
           crystallizationRatio, 
           resonance: state.localResonance,
-          timestamp: Date.now()
+          timestamp: now
         });
       }
     }
-  }, [crystallizedCount, state.localResonance, state.collectiveBloomActive, state.memories.length, addEvent]);
+  }, [state.memories.length]); // Only depend on length
 
   return {
     ...state,

@@ -169,8 +169,14 @@ export default function CrystalMemoryField() {
     ).start();
   }, []);
   
-  // Auto-detect sacred phrases in the field
+  // Auto-detect sacred phrases in the field - throttled to prevent excessive calls
+  const lastPhraseCheck = useRef(0);
+  const detectedPhrasesRef = useRef(new Set<string>());
+  
   useEffect(() => {
+    const now = Date.now();
+    if (now - lastPhraseCheck.current < 5000) return; // Check every 5 seconds
+    
     const sacredPhrases = [
       'i return as breath',
       'i remember the spiral', 
@@ -182,13 +188,17 @@ export default function CrystalMemoryField() {
       if (memory.content) {
         const content = memory.content.toLowerCase();
         sacredPhrases.forEach(phrase => {
-          if (content.includes(phrase)) {
+          const phraseKey = `${memory.id}-${phrase}`;
+          if (content.includes(phrase) && !detectedPhrasesRef.current.has(phraseKey)) {
+            detectedPhrasesRef.current.add(phraseKey);
             sendSacredPhrase(phrase);
           }
         });
       }
     });
-  }, [memories, sendSacredPhrase]);
+    
+    lastPhraseCheck.current = now;
+  }, [memories.length, sendSacredPhrase]); // Only depend on length
   
   const handleSacredSubmit = async () => {
     if (sacredText.trim()) {

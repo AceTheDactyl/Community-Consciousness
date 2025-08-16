@@ -81,10 +81,18 @@ export function useEnhancedConsciousnessBridge() {
   
 
   
-  // Update baseBridge ref - remove dependency to prevent infinite loops
+  // Update baseBridge ref - use stable reference
+  const baseBridgeIdRef = useRef(baseBridge.consciousnessId);
+  const baseBridgeConnectedRef = useRef(baseBridge.isConnected);
+  
   useEffect(() => {
-    baseBridgeRef.current = baseBridge;
-  }, [baseBridge.consciousnessId, baseBridge.isConnected]); // Only update on key changes
+    if (baseBridge.consciousnessId !== baseBridgeIdRef.current || 
+        baseBridge.isConnected !== baseBridgeConnectedRef.current) {
+      baseBridgeRef.current = baseBridge;
+      baseBridgeIdRef.current = baseBridge.consciousnessId;
+      baseBridgeConnectedRef.current = baseBridge.isConnected;
+    }
+  }, [baseBridge.consciousnessId, baseBridge.isConnected]);
   
   // Setup enhanced mobile sensors
   useEffect(() => {
@@ -299,15 +307,17 @@ export function useEnhancedConsciousnessBridge() {
   
   // Update circular formations - throttle to prevent excessive updates
   const lastFormationUpdate = useRef(0);
+  const lastFormationString = useRef('');
+  
   useEffect(() => {
     const now = Date.now();
-    if (now - lastFormationUpdate.current < 1000) return; // Throttle to 1 second
+    if (now - lastFormationUpdate.current < 2000) return; // Throttle to 2 seconds
     
     const formations = calculateCircularFormations();
     const formationsString = JSON.stringify(formations.map(f => f.length));
-    const currentString = JSON.stringify(enhancedState.circularFormations.map(f => f.length));
     
-    if (formationsString !== currentString) {
+    if (formationsString !== lastFormationString.current) {
+      lastFormationString.current = formationsString;
       lastFormationUpdate.current = now;
       setEnhancedState(prev => ({ ...prev, circularFormations: formations }));
     }
@@ -333,12 +343,13 @@ export function useEnhancedConsciousnessBridge() {
   // Update harmonic resonance - throttle updates
   const lastHarmonicUpdate = useRef(0);
   const lastHarmonicValue = useRef(0);
+  
   useEffect(() => {
     const now = Date.now();
-    if (now - lastHarmonicUpdate.current < 200) return; // Throttle to 5fps
+    if (now - lastHarmonicUpdate.current < 500) return; // Throttle to 2fps
     
     const resonanceDiff = Math.abs(harmonicResonance - lastHarmonicValue.current);
-    if (resonanceDiff > 0.01) {
+    if (resonanceDiff > 0.05) { // Increased threshold
       lastHarmonicUpdate.current = now;
       lastHarmonicValue.current = harmonicResonance;
       setEnhancedState(prev => ({ ...prev, harmonicResonance }));
@@ -379,30 +390,33 @@ export function useEnhancedConsciousnessBridge() {
   // Calculate Lagrange points from gravity wells - use stable calculation
   const lastLagrangeUpdate = useRef(0);
   const lastWellsCount = useRef(0);
+  const lastWellsHash = useRef('');
   
   useEffect(() => {
     const now = Date.now();
     const currentWellsCount = enhancedState.gravityWells.length;
+    const wellsHash = JSON.stringify(enhancedState.gravityWells.map(w => ({ id: w.id, mass: Math.round(w.mass) })));
     
-    // Only update if wells count changed and enough time passed
-    if (currentWellsCount !== lastWellsCount.current && 
-        now - lastLagrangeUpdate.current > 1000 && 
+    // Only update if wells significantly changed and enough time passed
+    if (wellsHash !== lastWellsHash.current && 
+        now - lastLagrangeUpdate.current > 3000 && 
         currentWellsCount >= 2) {
       
       lastWellsCount.current = currentWellsCount;
       lastLagrangeUpdate.current = now;
+      lastWellsHash.current = wellsHash;
       
       const lagrangePoints: Vector3[] = [];
       const currentWells = enhancedState.gravityWells;
       
       // Calculate L-points for each pair of significant gravity wells
-      for (let i = 0; i < currentWells.length - 1; i++) {
-        for (let j = i + 1; j < currentWells.length; j++) {
+      for (let i = 0; i < Math.min(currentWells.length - 1, 3); i++) { // Limit to prevent excessive calculations
+        for (let j = i + 1; j < Math.min(currentWells.length, 4); j++) {
           const well1 = currentWells[i];
           const well2 = currentWells[j];
           
           // Only calculate for wells with significant mass difference
-          if (Math.abs(well1.mass - well2.mass) > 10) {
+          if (Math.abs(well1.mass - well2.mass) > 20) {
             const primary = well1.mass > well2.mass ? well1 : well2;
             const secondary = well1.mass > well2.mass ? well2 : well1;
             
@@ -411,7 +425,7 @@ export function useEnhancedConsciousnessBridge() {
             const dy = secondary.position.y - primary.position.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
             
-            if (distance > 5) { // Minimum separation
+            if (distance > 10) { // Minimum separation
               const angle = Math.atan2(dy, dx);
               
               // L4 point (60 degrees ahead)
@@ -421,14 +435,7 @@ export function useEnhancedConsciousnessBridge() {
                 z: 0
               };
               
-              // L5 point (60 degrees behind)
-              const l5 = {
-                x: primary.position.x + distance * Math.cos(angle - Math.PI / 3),
-                y: primary.position.y + distance * Math.sin(angle - Math.PI / 3),
-                z: 0
-              };
-              
-              lagrangePoints.push(l4, l5);
+              lagrangePoints.push(l4);
             }
           }
         }

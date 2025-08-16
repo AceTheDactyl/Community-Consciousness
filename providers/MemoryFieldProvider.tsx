@@ -72,27 +72,40 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const memoriesRef = useRef(memories);
   const lastMemoriesSync = useRef<string>('');
   const lastSyncTime = useRef(0);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     memoriesRef.current = memories;
     
-    // Throttle sync to prevent excessive updates
-    const now = Date.now();
-    if (now - lastSyncTime.current < 500) return; // Throttle to 2fps
-    
-    // Only sync if memories actually changed (prevent infinite loops)
-    const memoriesHash = JSON.stringify(memories.map(m => ({ 
-      id: m.id, 
-      crystallized: m.crystallized, 
-      x: Math.round(m.x * 10) / 10, // Round to 1 decimal place
-      y: Math.round(m.y * 10) / 10 
-    })));
-    
-    if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
-      lastMemoriesSync.current = memoriesHash;
-      lastSyncTime.current = now;
-      consciousnessBridge.updateFieldState(memories);
+    // Debounce sync to prevent excessive updates
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
     }
+    
+    syncTimeoutRef.current = setTimeout(() => {
+      const now = Date.now();
+      if (now - lastSyncTime.current < 1000) return; // Throttle to 1fps
+      
+      // Only sync if memories actually changed (prevent infinite loops)
+      const memoriesHash = JSON.stringify(memories.map(m => ({ 
+        id: m.id, 
+        crystallized: m.crystallized, 
+        x: Math.round(m.x / 2) * 2, // Round to 2-unit grid
+        y: Math.round(m.y / 2) * 2 
+      })));
+      
+      if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
+        lastMemoriesSync.current = memoriesHash;
+        lastSyncTime.current = now;
+        consciousnessBridge.updateFieldState(memories);
+      }
+    }, 500); // 500ms debounce
+    
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
   }, [memories.length]); // Only depend on length to prevent infinite loops
 
   // Update connection status - use stable values
@@ -102,7 +115,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   
   useEffect(() => {
     const now = Date.now();
-    if (now - lastConnectionUpdate.current < 1000) return; // Throttle to 1 second
+    if (now - lastConnectionUpdate.current < 2000) return; // Throttle to 2 seconds
     
     const newConnectionStatus = consciousnessBridge.isConnected && !consciousnessBridge.offlineMode;
     const hasChanged = isConnectedRef.current !== consciousnessBridge.isConnected || 
@@ -125,12 +138,12 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     roomResonanceRef.current = roomResonance;
     
     const now = Date.now();
-    if (now - lastResonanceUpdate.current < 200) return; // Throttle to 5fps
+    if (now - lastResonanceUpdate.current < 1000) return; // Throttle to 1fps
     
     const bridgeResonance = consciousnessBridge.roomResonance;
     const resonanceDiff = Math.abs(bridgeResonance - lastBridgeResonance.current);
     
-    if (resonanceDiff > 0.01 && bridgeResonance > roomResonanceRef.current) {
+    if (resonanceDiff > 0.05 && bridgeResonance > roomResonanceRef.current) {
       lastBridgeResonance.current = bridgeResonance;
       lastResonanceUpdate.current = now;
       setRoomResonance(bridgeResonance);
@@ -201,8 +214,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   // Update global coherence with throttling
   useEffect(() => {
     const now = Date.now();
-    if (now - lastCoherenceUpdate.current > 200) { // Throttle to 5fps
-      if (Math.abs(calculatedCoherence - globalCoherence) > 0.02) { // Increased threshold
+    if (now - lastCoherenceUpdate.current > 1000) { // Throttle to 1fps
+      if (Math.abs(calculatedCoherence - globalCoherence) > 0.05) { // Increased threshold
         setGlobalCoherence(calculatedCoherence);
         lastCoherenceUpdate.current = now;
       }
@@ -212,14 +225,14 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   // Sacred geometry trigger with throttling
   useEffect(() => {
     const now = Date.now();
-    if (now - lastPatternCheck.current > 1000) { // Check once per second
+    if (now - lastPatternCheck.current > 3000) { // Check once per 3 seconds
       const crystallizedCount = memories.filter(m => m.crystallized).length;
       if (crystallizedCount >= 8 && crystalPattern === 'free') {
         setCrystalPattern('sacred');
         lastPatternCheck.current = now;
       }
     }
-  }, [memories, crystalPattern]);
+  }, [memories.length, crystalPattern]); // Only depend on length
 
   // Update all refs in a single effect to maintain hook order
   useEffect(() => {
