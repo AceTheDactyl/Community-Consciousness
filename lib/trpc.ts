@@ -78,7 +78,7 @@ export const trpcClient = trpc.createClient({
           
           // Create timeout promise
           const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Request timeout')), 10000);
+            setTimeout(() => reject(new Error('Request timeout')), 8000); // Reduced timeout
           });
           
           const fetchPromise = fetch(url, {
@@ -96,22 +96,44 @@ export const trpcClient = trpc.createClient({
           console.log('📡 tRPC response:', response.status, response.statusText);
           
           if (!response.ok) {
-            const errorText = await response.text().catch(() => 'Unknown error');
+            let errorText = 'Unknown error';
+            try {
+              errorText = await response.text();
+            } catch {
+              // Ignore text parsing errors
+            }
+            
             console.error('❌ tRPC HTTP error:', {
               status: response.status,
               statusText: response.statusText,
-              body: errorText
+              url: url,
+              body: errorText.substring(0, 200) // Limit error text length
             });
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            
+            // Provide specific error messages based on status
+            if (response.status === 404) {
+              throw new Error('tRPC endpoint not found - check backend routing');
+            } else if (response.status === 500) {
+              throw new Error('Backend server error - check server logs');
+            } else if (response.status >= 400 && response.status < 500) {
+              throw new Error(`Client error ${response.status}: ${response.statusText}`);
+            } else {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
           }
           
           return response;
         } catch (error) {
-          console.error('❌ tRPC fetch error:', error instanceof Error ? error.message : String(error));
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('❌ tRPC fetch error:', errorMessage);
           
           // Provide more helpful error messages
-          if (error instanceof TypeError && error.message.includes('fetch')) {
+          if (error instanceof TypeError && errorMessage.includes('fetch')) {
             throw new Error('Network error: Cannot connect to backend server');
+          } else if (errorMessage.includes('timeout')) {
+            throw new Error('Request timeout: Backend server not responding');
+          } else if (errorMessage.includes('ECONNREFUSED')) {
+            throw new Error('Connection refused: Backend server not running');
           }
           
           throw error;

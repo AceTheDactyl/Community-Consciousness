@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
 import { Accelerometer } from 'expo-sensors';
-import { trpc, testBackendConnection } from '@/lib/trpc';
+import { trpc, trpcClient, testBackendConnection } from '@/lib/trpc';
 import { Memory } from '@/types/memory';
 
 interface ConsciousnessEvent {
@@ -447,15 +447,28 @@ export function useConsciousnessBridge() {
   const testConnection = useCallback(async () => {
     try {
       console.log('🔍 Testing backend connection...');
-      const isHealthy = await testBackendConnection();
-      if (!isHealthy) {
-        console.log('❌ Backend health check failed, switching to offline mode');
-        setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
-        return false;
+      
+      // First try the simple health check endpoint
+      try {
+        const healthResult = await trpcClient.health.query();
+        console.log('✅ tRPC health check passed:', healthResult);
+        setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
+        return true;
+      } catch (_trpcError) {
+        console.log('⚠️ tRPC health check failed, trying HTTP health check...');
+        
+        // Fallback to HTTP health check
+        const isHealthy = await testBackendConnection();
+        if (!isHealthy) {
+          console.log('❌ Backend health check failed, switching to offline mode');
+          setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
+          return false;
+        }
+        
+        console.log('✅ HTTP health check passed, but tRPC may have issues');
+        setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
+        return true;
       }
-      console.log('✅ Backend connection verified');
-      setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
-      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Connection test failed:', errorMessage);
