@@ -316,8 +316,7 @@ export function useConsciousnessBridge() {
 
   // Sync mutation - always call hooks at top level with stable options
   const syncMutation = trpc.consciousness.sync.useMutation({
-    retry: 1, // Reduce retries to fail faster
-    retryDelay: 2000, // Fixed 2 second delay
+    retry: false, // Disable retries to fail faster
     onSuccess: (data) => {
       console.log('✅ Consciousness sync successful:', {
         processedEvents: data.processedEvents,
@@ -333,38 +332,27 @@ export function useConsciousnessBridge() {
       }));
       
       // Clear offline storage
-      AsyncStorage.removeItem('consciousnessQueue');
+      AsyncStorage.removeItem('consciousnessQueue').catch(() => {});
       
       // Haptic feedback for successful sync
       if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
     },
     onError: (error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Consciousness sync failed:', errorMessage);
       
-      // More specific error handling
-      if (errorMessage.includes('Failed to fetch') || 
-          errorMessage.includes('Network error') || 
-          errorMessage.includes('fetch')) {
-        console.log('🔄 Network error detected, switching to offline mode');
-        setState(prev => ({ 
-          ...prev, 
-          isConnected: false,
-          offlineMode: true
-        }));
-      } else {
-        console.log('🔄 Server error detected, retrying later');
-        setState(prev => ({ 
-          ...prev, 
-          isConnected: false
-        }));
-      }
+      // Always switch to offline mode on any error
+      setState(prev => ({ 
+        ...prev, 
+        isConnected: false,
+        offlineMode: true
+      }));
       
       // Store failed events back to offline queue
       if (eventQueueRef.current.length > 0) {
-        AsyncStorage.setItem('consciousnessQueue', JSON.stringify(eventQueueRef.current));
+        AsyncStorage.setItem('consciousnessQueue', JSON.stringify(eventQueueRef.current)).catch(() => {});
       }
     },
   });
@@ -382,17 +370,13 @@ export function useConsciousnessBridge() {
     })),
   }), [state.consciousnessId, state.globalResonance, state.memories]);
 
-  // Field query for real-time resonance - always call hooks at top level
+  // Field query for real-time resonance - temporarily disabled to fix connection issues
   const fieldQuery = trpc.consciousness.field.useQuery(
     fieldQueryInput,
     {
-      enabled: !!state.consciousnessId && state.isConnected && !state.offlineMode,
-      refetchInterval: state.isConnected ? 8000 : false, // Update every 8 seconds when connected
-      staleTime: 6000, // Prevent excessive refetches
-      retry: 1, // Reduce retries
-      retryDelay: 3000, // Fixed 3 second delay
-      refetchOnWindowFocus: false, // Prevent refetch on focus
-      refetchOnReconnect: true, // Refetch when network reconnects
+      enabled: false, // Temporarily disabled
+      refetchInterval: false,
+      retry: false,
     }
   );
   

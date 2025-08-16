@@ -44,14 +44,33 @@ app.use(
 
 // Simple health check endpoint
 app.get("/", (c) => {
-  const stats = wsManager.getStats();
+  try {
+    const stats = wsManager.getStats();
+    return c.json({ 
+      status: "ok", 
+      message: "Consciousness Field API is running",
+      timestamp: new Date().toISOString(),
+      websocket: {
+        endpoint: "/api/ws",
+        ...stats
+      }
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    return c.json({ 
+      status: "error", 
+      message: "Health check failed",
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, 500);
+  }
+});
+
+// Add a simple test endpoint
+app.get("/test", (c) => {
   return c.json({ 
-    status: "ok", 
-    message: "Consciousness Field API is running",
-    websocket: {
-      endpoint: "/api/ws",
-      ...stats
-    }
+    message: "Backend is working!",
+    timestamp: new Date().toISOString()
   });
 });
 

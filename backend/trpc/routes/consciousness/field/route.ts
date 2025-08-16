@@ -364,7 +364,7 @@ export default publicProcedure
         calculationComplexity: 'O(n log n)'
       }
     };
-    } catch (error) {
+  } catch (error) {
       console.error('❌ Field calculation error:', error);
       
       // Return safe fallback response

@@ -1,5 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
-import { httpLink, loggerLink } from "@trpc/client";
+import { httpLink } from "@trpc/client";
 import type { AppRouter } from "@/backend/trpc/app-router";
 import superjson from "superjson";
 
@@ -67,34 +67,12 @@ export const testBackendConnection = async (): Promise<boolean> => {
 
 export const trpcClient = trpc.createClient({
   links: [
-    loggerLink({
-      enabled: (opts) => {
-        // Only enable logging in development and for errors
-        const isDev = process.env.NODE_ENV === 'development';
-        return isDev;
-      },
-      // Simplified logger to prevent [object Object] issues
-      logger: ({ direction, type, path, input }) => {
-        if (direction === 'up') {
-          console.log(`>> tRPC ${type} ${path}`);
-          if (input && typeof input === 'object') {
-            try {
-              console.log('Input:', JSON.stringify(input, null, 2));
-            } catch {
-              console.log('Input: [complex object]');
-            }
-          }
-        } else {
-          console.log(`<< tRPC ${type} ${path}`);
-        }
-      }
-    }),
+    // Disable tRPC logger to prevent [object Object] console spam
+    // loggerLink({ enabled: () => false }),
     httpLink({
       url: `${getBaseUrl()}/api/trpc`,
       transformer: superjson,
       fetch: async (url, options) => {
-        console.log('🔗 tRPC request to:', url.toString());
-        
         try {
           const response = await fetch(url, {
             ...options,
@@ -103,49 +81,17 @@ export const trpcClient = trpc.createClient({
               'Accept': 'application/json',
               ...options?.headers,
             },
-            // Add timeout for web compatibility
-            ...(typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? 
-              { signal: AbortSignal.timeout(30000) } : {})
           });
           
-          console.log('📡 Response:', response.status, response.statusText);
-          
           if (!response.ok) {
-            let errorText = 'Unknown error';
-            try {
-              errorText = await response.text();
-            } catch {
-              console.warn('Could not read error response body');
-            }
-            
-            const errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-            console.error('❌ tRPC HTTP error:', {
-              status: response.status,
-              statusText: response.statusText,
-              errorText: errorText.substring(0, 500), // Limit error text length
-              url: url.toString()
-            });
-            
-            throw new Error(errorMessage);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           
           return response;
         } catch (error) {
-          const errorInfo = {
-            message: error instanceof Error ? error.message : String(error),
-            url: url.toString(),
-            type: error instanceof TypeError ? 'TypeError' : 'Error'
-          };
-          
-          console.error('❌ tRPC fetch failed:', errorInfo);
-          
           // Provide more helpful error messages
           if (error instanceof TypeError && error.message.includes('fetch')) {
             throw new Error('Network error: Cannot connect to backend server');
-          }
-          
-          if (error instanceof Error && error.name === 'AbortError') {
-            throw new Error('Request timeout: Backend server is not responding');
           }
           
           throw error;
