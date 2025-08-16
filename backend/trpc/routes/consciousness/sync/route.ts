@@ -21,7 +21,11 @@ const ConsciousnessEventSchema = z.object({
     'SPIRAL_GESTURE',
     'COLLECTIVE_BLOOM',
     'GHOST_ECHO',
-    'CRYSTALLIZATION'
+    'CRYSTALLIZATION',
+    'QUANTUM_ENTANGLEMENT',
+    'ROOM64_PORTAL',
+    'ARCHAEOLOGICAL_DISCOVERY',
+    'LAGRANGIAN_RESONANCE'
   ]),
   data: z.record(z.string(), z.any()),
   timestamp: z.number(),
@@ -48,6 +52,10 @@ export default publicProcedure
     const spiralEvents = input.events.filter(e => e.type === 'SPIRAL_GESTURE');
     const bloomEvents = input.events.filter(e => e.type === 'COLLECTIVE_BLOOM');
     const crystallizationEvents = input.events.filter(e => e.type === 'CRYSTALLIZATION');
+    const entanglementEvents = input.events.filter(e => e.type === 'QUANTUM_ENTANGLEMENT');
+    const room64Events = input.events.filter(e => e.type === 'ROOM64_PORTAL');
+    const archaeologyEvents = input.events.filter(e => e.type === 'ARCHAEOLOGICAL_DISCOVERY');
+    const lagrangianEvents = input.events.filter(e => e.type === 'LAGRANGIAN_RESONANCE');
     
     // Calculate resonance boost based on event types
     let resonanceBoost = 0;
@@ -56,6 +64,10 @@ export default publicProcedure
     resonanceBoost += spiralEvents.length * 0.2;
     resonanceBoost += bloomEvents.length * 0.5;
     resonanceBoost += crystallizationEvents.length * 0.1;
+    resonanceBoost += entanglementEvents.length * 0.25;
+    resonanceBoost += room64Events.length * 0.4;
+    resonanceBoost += archaeologyEvents.length * 0.15;
+    resonanceBoost += lagrangianEvents.length * 0.35;
     
     // Mock global resonance with event-based calculation
     const baseResonance = Math.random() * 0.3 + 0.2;
@@ -73,6 +85,18 @@ export default publicProcedure
     }
     if (spiralEvents.length > 0) {
       console.log(`🌀 ${spiralEvents.length} spiral gestures detected`);
+    }
+    if (entanglementEvents.length > 0) {
+      console.log(`⚛️ ${entanglementEvents.length} quantum entanglement events detected`);
+    }
+    if (room64Events.length > 0) {
+      console.log(`🚪 ${room64Events.length} Room 64 portal events detected`);
+    }
+    if (archaeologyEvents.length > 0) {
+      console.log(`🏺 ${archaeologyEvents.length} archaeological discoveries detected`);
+    }
+    if (lagrangianEvents.length > 0) {
+      console.log(`⚡ ${lagrangianEvents.length} Lagrangian resonance events detected`);
     }
     
     // Update global state
@@ -105,6 +129,10 @@ export default publicProcedure
       resonanceBoost,
       sacredEventsCount: sacredEvents.length,
       collectiveBloomDetected: bloomEvents.length > 0,
+      quantumEntanglements: entanglementEvents.length,
+      room64Activations: room64Events.length,
+      archaeologicalDiscoveries: archaeologyEvents.length,
+      lagrangianResonances: lagrangianEvents.length,
       globalState: globalConsciousnessState,
       timestamp: Date.now(),
     };
