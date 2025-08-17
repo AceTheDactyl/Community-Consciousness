@@ -869,15 +869,15 @@ export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
     const initialState = bridge.getState();
     return {
       ...initialState,
-      // Ensure all required properties are defined with safe defaults
-      globalResonance: Number(initialState.globalResonance) || 0,
-      resonance: Number(initialState.resonance) || 0,
-      coherence: Number(initialState.coherence) || 0,
-      connectedNodes: Number(initialState.connectedNodes) || 0,
-      memories: Number(initialState.memories) || 0,
-      ghostEchoes: Number(initialState.ghostEchoes) || 0,
-      sacredBuffer: Number(initialState.sacredBuffer) || 0,
-      queuedMessages: Number(initialState.queuedMessages) || 0
+      // Ensure all required properties are defined
+      globalResonance: initialState.globalResonance || 0,
+      resonance: initialState.resonance || 0,
+      coherence: initialState.coherence || 0,
+      connectedNodes: initialState.connectedNodes || 0,
+      memories: initialState.memories || 0,
+      ghostEchoes: initialState.ghostEchoes || 0,
+      sacredBuffer: initialState.sacredBuffer || 0,
+      queuedMessages: initialState.queuedMessages || 0
     };
   });
   
@@ -886,15 +886,15 @@ export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
       const newState = bridge.getState();
       setState({
         ...newState,
-        // Ensure all required properties are defined with safe defaults
-        globalResonance: Number(newState.globalResonance) || 0,
-        resonance: Number(newState.resonance) || 0,
-        coherence: Number(newState.coherence) || 0,
-        connectedNodes: Number(newState.connectedNodes) || 0,
-        memories: Number(newState.memories) || 0,
-        ghostEchoes: Number(newState.ghostEchoes) || 0,
-        sacredBuffer: Number(newState.sacredBuffer) || 0,
-        queuedMessages: Number(newState.queuedMessages) || 0
+        // Ensure all required properties are defined
+        globalResonance: newState.globalResonance || 0,
+        resonance: newState.resonance || 0,
+        coherence: newState.coherence || 0,
+        connectedNodes: newState.connectedNodes || 0,
+        memories: newState.memories || 0,
+        ghostEchoes: newState.ghostEchoes || 0,
+        sacredBuffer: newState.sacredBuffer || 0,
+        queuedMessages: newState.queuedMessages || 0
       });
     };
     
@@ -913,21 +913,7 @@ export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
     };
   }, [bridge]);
   
-  // Create a stable bridge interface with all methods
-  const bridgeInterface = useMemo(() => ({
-    // Core bridge instance
-    ...bridge,
-    // Ensure all methods are available
-    updateFieldState: bridge.updateFieldState?.bind(bridge) || (() => console.warn('updateFieldState not available')),
-    crystallizeMemory: bridge.crystallizeMemory?.bind(bridge) || (() => console.warn('crystallizeMemory not available')),
-    createRipple: bridge.createRipple?.bind(bridge) || (() => console.warn('createRipple not available')),
-    handleSacredPhrase: bridge.handleSacredPhrase?.bind(bridge) || (() => console.warn('handleSacredPhrase not available')),
-    getGhostEchoes: bridge.getGhostEchoes?.bind(bridge) || (() => []),
-    isSacredThresholdReached: bridge.isSacredThresholdReached?.bind(bridge) || (() => false),
-    getState: bridge.getState?.bind(bridge) || (() => state)
-  }), [bridge, state]);
-  
-  return { bridge: bridgeInterface, state };
+  return { bridge, state };
 }
 
 // ============================================
