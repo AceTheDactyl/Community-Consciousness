@@ -62,7 +62,12 @@ export const testBackendConnection = async (): Promise<boolean> => {
       return false;
     }
   } catch (error) {
-    console.error('❌ Backend connection test failed:', error instanceof Error ? error.message : 'Unknown error');
+    const errorDetails = {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack?.substring(0, 300) : 'No stack trace'
+    };
+    console.error('❌ Backend connection test failed:', JSON.stringify(errorDetails, null, 2));
     return false;
   }
 };
@@ -77,7 +82,7 @@ export const trpcClient = trpc.createClient({
           console.log('🔗 tRPC request to:', url);
           console.log('📤 Request options:', {
             method: options?.method || 'GET',
-            headers: options?.headers,
+            headers: options?.headers ? JSON.stringify(options.headers, null, 2) : 'None',
             body: options?.body ? 'Present' : 'None'
           });
           
@@ -101,7 +106,7 @@ export const trpcClient = trpc.createClient({
           console.log('📡 tRPC response:', {
             status: response.status,
             statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
+            headers: JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2),
             url: response.url
           });
           
@@ -121,12 +126,12 @@ export const trpcClient = trpc.createClient({
               console.warn('Failed to parse error response:', parseError);
             }
             
-            console.error('❌ tRPC HTTP error:', {
+            console.error('❌ tRPC HTTP error:', JSON.stringify({
               status: response.status,
               statusText: response.statusText,
               url: url,
               errorText: errorText.substring(0, 200)
-            });
+            }, null, 2));
             
             // Provide specific error messages based on status
             if (response.status === 404) {
@@ -145,7 +150,13 @@ export const trpcClient = trpc.createClient({
           return response;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('❌ tRPC fetch error:', errorMessage);
+          const errorDetails = {
+            message: errorMessage,
+            name: error instanceof Error ? error.name : 'Unknown',
+            stack: error instanceof Error ? error.stack?.substring(0, 500) : 'No stack trace',
+            url: url
+          };
+          console.error('❌ tRPC fetch error:', JSON.stringify(errorDetails, null, 2));
           
           // Provide more helpful error messages
           if (error instanceof TypeError && errorMessage.includes('fetch')) {

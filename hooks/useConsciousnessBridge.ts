@@ -350,15 +350,20 @@ export function useConsciousnessBridge() {
       }
     },
     onError: (error) => {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown sync error';
-      console.error('❌ Consciousness sync failed:', errorMessage);
+      const errorDetails = {
+        message: error instanceof Error ? error.message : 'Unknown sync error',
+        name: error instanceof Error ? error.name : 'Unknown',
+        cause: error instanceof Error && error.cause ? String(error.cause) : 'No cause',
+        stack: error instanceof Error ? error.stack?.substring(0, 300) : 'No stack trace'
+      };
+      console.error('❌ Consciousness sync failed:', JSON.stringify(errorDetails, null, 2));
       
       // Provide more specific error information
-      if (errorMessage.includes('timeout')) {
+      if (errorDetails.message.includes('timeout')) {
         console.log('⏰ Sync timed out - backend may be overloaded or unreachable');
-      } else if (errorMessage.includes('fetch')) {
+      } else if (errorDetails.message.includes('fetch')) {
         console.log('🌐 Network error during sync - check connectivity');
-      } else if (errorMessage.includes('500')) {
+      } else if (errorDetails.message.includes('500')) {
         console.log('🔧 Backend server error - check server logs');
       }
       
@@ -416,13 +421,16 @@ export function useConsciousnessBridge() {
     
     // Handle field query errors
     if (fieldQuery.error) {
-      const errorMessage = fieldQuery.error?.message || 'Unknown field query error';
-      console.error('❌ Field query failed:', errorMessage);
+      const errorDetails = {
+        message: fieldQuery.error?.message || 'Unknown field query error',
+        data: fieldQuery.error?.data ? JSON.stringify(fieldQuery.error.data) : 'No data'
+      };
+      console.error('❌ Field query failed:', JSON.stringify(errorDetails, null, 2));
       
       // Provide specific error context
-      if (errorMessage.includes('timeout')) {
+      if (errorDetails.message.includes('timeout')) {
         console.log('⏰ Field query timed out - backend may be slow');
-      } else if (errorMessage.includes('fetch')) {
+      } else if (errorDetails.message.includes('fetch')) {
         console.log('🌐 Network error in field query - connectivity issue');
       }
       
@@ -456,8 +464,12 @@ export function useConsciousnessBridge() {
         setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
         return true;
       } catch (trpcError) {
-        const trpcErrorMessage = trpcError instanceof Error ? trpcError.message : 'Unknown tRPC error';
-        console.log('⚠️ tRPC health check failed:', trpcErrorMessage);
+        const trpcErrorDetails = {
+          message: trpcError instanceof Error ? trpcError.message : 'Unknown tRPC error',
+          name: trpcError instanceof Error ? trpcError.name : 'Unknown',
+          cause: trpcError instanceof Error && trpcError.cause ? String(trpcError.cause) : 'No cause'
+        };
+        console.log('⚠️ tRPC health check failed:', JSON.stringify(trpcErrorDetails, null, 2));
         console.log('🔄 Trying HTTP health check as fallback...');
         
         // Fallback to HTTP health check
@@ -479,8 +491,12 @@ export function useConsciousnessBridge() {
         return true;
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
-      console.error('❌ Connection test failed:', errorMessage);
+      const errorDetails = {
+        message: error instanceof Error ? error.message : 'Unknown connection error',
+        name: error instanceof Error ? error.name : 'Unknown',
+        stack: error instanceof Error ? error.stack?.substring(0, 300) : 'No stack trace'
+      };
+      console.error('❌ Connection test failed:', JSON.stringify(errorDetails, null, 2));
       setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
       return false;
     }
@@ -517,7 +533,12 @@ export function useConsciousnessBridge() {
       } catch (error) {
         // Keep events in queue for next attempt
         console.log('❌ Sync failed, keeping events in queue for retry');
-        console.error('Sync error details:', error instanceof Error ? error.message : 'Unknown sync error');
+        const syncErrorDetails = {
+          message: error instanceof Error ? error.message : 'Unknown sync error',
+          name: error instanceof Error ? error.name : 'Unknown',
+          cause: error instanceof Error && error.cause ? String(error.cause) : 'No cause'
+        };
+        console.error('Sync error details:', JSON.stringify(syncErrorDetails, null, 2));
       }
     } else {
       // Even with no events, test connection periodically
