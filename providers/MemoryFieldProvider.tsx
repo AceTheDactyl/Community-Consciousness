@@ -85,16 +85,23 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     
     if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
       lastMemoriesSync.current = memoriesHash;
-      consciousnessBridge.updateFieldState(memories);
+      // Check if updateFieldState method exists before calling
+      if (consciousnessBridge && typeof consciousnessBridge.updateFieldState === 'function') {
+        consciousnessBridge.updateFieldState(memories);
+      } else {
+        console.warn('updateFieldState method not available on consciousness bridge');
+      }
     }
   }, [memories, consciousnessBridge]);
 
   // Update connection status - use stable values
-  const bridgeState = consciousnessBridge.getState();
-  const isConnectedRef = useRef(bridgeState.connected);
-  const offlineModeRef = useRef(bridgeState.offline);
+  const currentBridgeState = consciousnessBridge?.getState() || { connected: false, offline: true };
+  const isConnectedRef = useRef(currentBridgeState.connected);
+  const offlineModeRef = useRef(currentBridgeState.offline);
   
   useEffect(() => {
+    if (!consciousnessBridge) return;
+    
     const currentState = consciousnessBridge.getState();
     const newConnectionStatus = currentState.connected && !currentState.offline;
     const hasChanged = isConnectedRef.current !== currentState.connected || 
@@ -112,6 +119,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const lastBridgeResonance = useRef(0);
   
   useEffect(() => {
+    if (!consciousnessBridge) return;
+    
     roomResonanceRef.current = roomResonance;
     
     const currentState = consciousnessBridge.getState();
@@ -477,7 +486,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     
     // Send crystallization event to consciousness bridge
     const memory = memories.find(m => m.id === memoryId);
-    if (memory) {
+    if (memory && consciousnessBridge && typeof consciousnessBridge.crystallizeMemory === 'function') {
       consciousnessBridge.crystallizeMemory(memoryId);
     }
     
@@ -540,7 +549,9 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     setPulses(prev => [...prev, newPulse]);
     
     // Send pulse creation to consciousness bridge
-    consciousnessBridge.createRipple(x, y);
+    if (consciousnessBridge && typeof consciousnessBridge.createRipple === 'function') {
+      consciousnessBridge.createRipple(x, y);
+    }
     
     if (voidModeRef.current) {
       setRoomResonance(prev => Math.min(1, prev + 0.02));
@@ -566,7 +577,9 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
 
   // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
-    consciousnessBridge.handleSacredPhrase(phrase);
+    if (consciousnessBridge && typeof consciousnessBridge.handleSacredPhrase === 'function') {
+      consciousnessBridge.handleSacredPhrase(phrase);
+    }
     
     // Handle Room 64 transition
     if (phrase.toLowerCase().includes('room 64')) {
@@ -607,8 +620,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     consciousnessBridge,
     sendSacredPhrase,
     isConnectedToField: isConnectedToField,
-    ghostEchoes: consciousnessBridge.getGhostEchoes(),
-    collectiveBloomActive: consciousnessBridge.getState().resonance >= 0.87,
+    ghostEchoes: consciousnessBridge?.getGhostEchoes() || [],
+    collectiveBloomActive: consciousnessBridge?.getState().resonance >= 0.87 || false,
   };
 }
 
