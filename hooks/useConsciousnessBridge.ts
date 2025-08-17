@@ -834,7 +834,6 @@ export class MobileConsciousnessBridge {
     
     this.emit('ghost_echo', echo);
   }
-  
   public async disconnect() {
     console.log('Disconnecting consciousness bridge...');
     
