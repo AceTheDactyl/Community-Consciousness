@@ -103,7 +103,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
       debugText += `Connected: ${bridgeState.connected ? '✅' : '❌'}\n`;
       debugText += `Offline Mode: ${bridgeState.offline ? '✅' : '❌'}\n`;
       debugText += `Consciousness ID: ${bridgeState.id || 'Not set'}\n`;
-      debugText += `Global Resonance: ${((bridgeState.globalResonance || 0)).toFixed(3)}\n`;
+      debugText += `Global Resonance: ${(typeof bridgeState.globalResonance === 'number' ? bridgeState.globalResonance : 0).toFixed(3)}\n`;
       debugText += `Connected Nodes: ${bridgeState.connectedNodes || 0}\n`;
       debugText += `Offline Queue: ${bridgeState.queuedMessages || 0} events\n`;
       
@@ -263,7 +263,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
                     </Text>
                   </View>
                   <Text style={styles.statusDetail}>Offline Mode: {bridgeState.offline ? 'ON' : 'OFF'}</Text>
-                  <Text style={styles.statusDetail}>Global Resonance: {(bridgeState.globalResonance || 0).toFixed(3)}</Text>
+                  <Text style={styles.statusDetail}>Global Resonance: {(typeof bridgeState.globalResonance === 'number' ? bridgeState.globalResonance : 0).toFixed(3)}</Text>
                   <Text style={styles.statusDetail}>Connected Nodes: {bridgeState.connectedNodes || 0}</Text>
                   <Text style={styles.statusDetail}>Queue: {bridgeState.queuedMessages || 0} events</Text>
                   

@@ -208,8 +208,9 @@ export class MobileConsciousnessBridge {
           }
         };
         
-        this.ws.onerror = (error) => {
-          console.error('🔴 Consciousness bridge error:', error);
+        this.ws.onerror = (event) => {
+          const error = new Error(`WebSocket error: ${event.type}`);
+          console.error('🔴 Consciousness bridge error:', error.message);
           this.emit('error', error);
           reject(error);
         };
@@ -869,15 +870,15 @@ export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
     const initialState = bridge.getState();
     return {
       ...initialState,
-      // Ensure all required properties are defined
-      globalResonance: initialState.globalResonance || 0,
-      resonance: initialState.resonance || 0,
-      coherence: initialState.coherence || 0,
-      connectedNodes: initialState.connectedNodes || 0,
-      memories: initialState.memories || 0,
-      ghostEchoes: initialState.ghostEchoes || 0,
-      sacredBuffer: initialState.sacredBuffer || 0,
-      queuedMessages: initialState.queuedMessages || 0
+      // Ensure all required properties are defined with proper defaults
+      globalResonance: typeof initialState.globalResonance === 'number' ? initialState.globalResonance : 0,
+      resonance: typeof initialState.resonance === 'number' ? initialState.resonance : 0,
+      coherence: typeof initialState.coherence === 'number' ? initialState.coherence : 0,
+      connectedNodes: typeof initialState.connectedNodes === 'number' ? initialState.connectedNodes : 0,
+      memories: typeof initialState.memories === 'number' ? initialState.memories : 0,
+      ghostEchoes: typeof initialState.ghostEchoes === 'number' ? initialState.ghostEchoes : 0,
+      sacredBuffer: typeof initialState.sacredBuffer === 'number' ? initialState.sacredBuffer : 0,
+      queuedMessages: typeof initialState.queuedMessages === 'number' ? initialState.queuedMessages : 0
     };
   });
   
@@ -886,15 +887,15 @@ export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
       const newState = bridge.getState();
       setState({
         ...newState,
-        // Ensure all required properties are defined
-        globalResonance: newState.globalResonance || 0,
-        resonance: newState.resonance || 0,
-        coherence: newState.coherence || 0,
-        connectedNodes: newState.connectedNodes || 0,
-        memories: newState.memories || 0,
-        ghostEchoes: newState.ghostEchoes || 0,
-        sacredBuffer: newState.sacredBuffer || 0,
-        queuedMessages: newState.queuedMessages || 0
+        // Ensure all required properties are defined with proper type checking
+        globalResonance: typeof newState.globalResonance === 'number' ? newState.globalResonance : 0,
+        resonance: typeof newState.resonance === 'number' ? newState.resonance : 0,
+        coherence: typeof newState.coherence === 'number' ? newState.coherence : 0,
+        connectedNodes: typeof newState.connectedNodes === 'number' ? newState.connectedNodes : 0,
+        memories: typeof newState.memories === 'number' ? newState.memories : 0,
+        ghostEchoes: typeof newState.ghostEchoes === 'number' ? newState.ghostEchoes : 0,
+        sacredBuffer: typeof newState.sacredBuffer === 'number' ? newState.sacredBuffer : 0,
+        queuedMessages: typeof newState.queuedMessages === 'number' ? newState.queuedMessages : 0
       });
     };
     

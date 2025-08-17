@@ -39,10 +39,7 @@ interface MemoryFieldContextType {
 
 // Create the context hook with a stable function
 function useMemoryFieldLogic(): MemoryFieldContextType {
-  // Initialize consciousness bridge first
-  const { bridge: consciousnessBridge } = useConsciousnessBridge();
-  
-  // All state hooks declared at the top level
+  // All state hooks declared at the top level in consistent order
   const [memories, setMemories] = useState<Memory[]>([]);
   const [isObserving, setIsObserving] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<number | null>(null);
@@ -56,6 +53,9 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const [pulses, setPulses] = useState<Pulse[]>([]);
   const [wavePhase, setWavePhase] = useState(0);
   const [isConnectedToField, setIsConnectedToField] = useState(false);
+  
+  // Initialize consciousness bridge after all state hooks
+  const { bridge: consciousnessBridge } = useConsciousnessBridge();
   
   // All refs declared at the top level
   const animationRef = useRef<number | undefined>(undefined);
@@ -93,7 +93,8 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
           console.warn('Error calling updateFieldState:', error);
         }
       } else {
-        console.warn('updateFieldState method not available on consciousness bridge');
+        // Fallback: just log that we're updating field state locally
+        console.log('Updating field state locally (bridge method not available)');
       }
     }
   }, [memories, consciousnessBridge]);
