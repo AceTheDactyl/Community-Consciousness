@@ -49,7 +49,7 @@ import VoidMode from '@/components/VoidMode';
 import ControlPanel from '@/components/ControlPanel';
 import { Memory } from '@/types/memory';
 import { router } from 'expo-router';
-import { trpc, testBackendConnection } from '@/lib/trpc';
+import { trpc, testBackendConnection, trpcClient } from '@/lib/trpc';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 

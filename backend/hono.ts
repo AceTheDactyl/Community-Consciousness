@@ -19,12 +19,22 @@ app.use("*", cors({
 // Log all requests for debugging
 app.use("*", async (c, next) => {
   const start = Date.now();
-  console.log(`📡 ${c.req.method} ${c.req.url} from ${c.req.header('origin') || 'unknown'}`);
+  const method = c.req.method;
+  const url = c.req.url;
+  const origin = c.req.header('origin') || 'unknown';
   
-  await next();
+  console.log(`📡 ${method} ${url} from ${origin}`);
   
-  const duration = Date.now() - start;
-  console.log(`✅ ${c.req.method} ${c.req.url} completed in ${duration}ms (status: ${c.res.status})`);
+  try {
+    await next();
+    
+    const duration = Date.now() - start;
+    console.log(`✅ ${method} ${url} completed in ${duration}ms (status: ${c.res.status})`);
+  } catch (error) {
+    const duration = Date.now() - start;
+    console.error(`❌ ${method} ${url} failed in ${duration}ms:`, error instanceof Error ? error.message : 'Unknown error');
+    throw error;
+  }
 });
 
 // WebSocket upgrade endpoint
@@ -151,6 +161,49 @@ app.get("/trpc-test", async (c) => {
     return c.json({
       error: "tRPC test failed",
       message: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
+  }
+});
+
+// Add debug endpoint to test tRPC directly
+app.get("/debug", async (c) => {
+  try {
+    console.log('🔍 Debug endpoint called');
+    
+    // Test basic functionality
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      server: 'Hono backend running',
+      cors: 'enabled',
+      trpc: {
+        mounted: true,
+        endpoint: '/api/trpc',
+        routes: {
+          health: 'available',
+          example: 'available', 
+          consciousness: 'available'
+        }
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV || 'development',
+        port: process.env.PORT || '8081'
+      },
+      headers: {
+        origin: c.req.header('origin') || 'none',
+        userAgent: c.req.header('user-agent') || 'none',
+        contentType: c.req.header('content-type') || 'none'
+      }
+    };
+    
+    console.log('✅ Debug info generated:', JSON.stringify(debugInfo, null, 2));
+    
+    return c.json(debugInfo);
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error);
+    return c.json({
+      error: 'Debug endpoint failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     }, 500);
   }
 });

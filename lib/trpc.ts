@@ -62,7 +62,7 @@ export const testBackendConnection = async (): Promise<boolean> => {
       return false;
     }
   } catch (error) {
-    console.error('❌ Backend connection test failed:', error instanceof Error ? error.message : String(error));
+    console.error('❌ Backend connection test failed:', error instanceof Error ? error.message : 'Unknown error');
     return false;
   }
 };
@@ -125,8 +125,7 @@ export const trpcClient = trpc.createClient({
               status: response.status,
               statusText: response.statusText,
               url: url,
-              errorData,
-              errorText: errorText.substring(0, 500) // Increased limit
+              errorText: errorText.substring(0, 200)
             });
             
             // Provide specific error messages based on status
@@ -146,11 +145,7 @@ export const trpcClient = trpc.createClient({
           return response;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('❌ tRPC fetch error:', {
-            message: errorMessage,
-            url,
-            stack: error instanceof Error ? error.stack : undefined
-          });
+          console.error('❌ tRPC fetch error:', errorMessage);
           
           // Provide more helpful error messages
           if (error instanceof TypeError && errorMessage.includes('fetch')) {

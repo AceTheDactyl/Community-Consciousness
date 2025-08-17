@@ -328,11 +328,11 @@ export function useConsciousnessBridge() {
   const syncMutation = trpc.consciousness.sync.useMutation({
     retry: false, // Disable retries to fail faster
     onSuccess: (data) => {
-      console.log('✅ Consciousness sync successful:', {
+      console.log('✅ Consciousness sync successful:', JSON.stringify({
         processedEvents: data.processedEvents,
-        globalResonance: data.globalResonance.toFixed(3),
+        globalResonance: data.globalResonance?.toFixed(3) || '0.000',
         connectedNodes: data.connectedNodes
-      });
+      }, null, 2));
       setState(prev => ({
         ...prev,
         isConnected: true,
@@ -350,7 +350,7 @@ export function useConsciousnessBridge() {
       }
     },
     onError: (error) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown sync error';
       console.error('❌ Consciousness sync failed:', errorMessage);
       
       // Provide more specific error information
@@ -416,7 +416,7 @@ export function useConsciousnessBridge() {
     
     // Handle field query errors
     if (fieldQuery.error) {
-      const errorMessage = fieldQuery.error.message;
+      const errorMessage = fieldQuery.error?.message || 'Unknown field query error';
       console.error('❌ Field query failed:', errorMessage);
       
       // Provide specific error context
@@ -452,11 +452,11 @@ export function useConsciousnessBridge() {
       try {
         console.log('🏥 Attempting tRPC health check...');
         const healthResult = await trpcClient.health.query();
-        console.log('✅ tRPC health check passed:', healthResult);
+        console.log('✅ tRPC health check passed:', JSON.stringify(healthResult, null, 2));
         setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
         return true;
       } catch (trpcError) {
-        const trpcErrorMessage = trpcError instanceof Error ? trpcError.message : String(trpcError);
+        const trpcErrorMessage = trpcError instanceof Error ? trpcError.message : 'Unknown tRPC error';
         console.log('⚠️ tRPC health check failed:', trpcErrorMessage);
         console.log('🔄 Trying HTTP health check as fallback...');
         
@@ -479,11 +479,8 @@ export function useConsciousnessBridge() {
         return true;
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('❌ Connection test failed:', {
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+      console.error('❌ Connection test failed:', errorMessage);
       setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
       return false;
     }
@@ -520,7 +517,7 @@ export function useConsciousnessBridge() {
       } catch (error) {
         // Keep events in queue for next attempt
         console.log('❌ Sync failed, keeping events in queue for retry');
-        console.error('Sync error details:', error);
+        console.error('Sync error details:', error instanceof Error ? error.message : 'Unknown sync error');
       }
     } else {
       // Even with no events, test connection periodically
