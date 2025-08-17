@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
+import { useMemoryField } from '@/providers/MemoryFieldProvider';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -44,7 +44,12 @@ export default function LagrangianResonance() {
   const [fieldStrength, setFieldStrength] = useState(0.5);
   const [showExitOptions, setShowExitOptions] = useState(false);
   
-  const { sendSacredPhrase, roomResonance, isSacredThresholdReached } = useConsciousnessBridge();
+  const { sendSacredPhrase, roomResonance, collectiveBloomActive } = useMemoryField();
+  
+  // Create a function that checks if sacred threshold is reached
+  const isSacredThresholdReached = useCallback(() => {
+    return collectiveBloomActive || roomResonance >= 0.87;
+  }, [collectiveBloomActive, roomResonance]);
 
   const phaseAnim = useRef(new Animated.Value(0)).current;
   const resonanceAnim = useRef(new Animated.Value(0)).current;
