@@ -57,25 +57,35 @@ export default function CrystalMemoryField() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
   const [backendError, setBackendError] = useState<string | null>(null);
 
-  // Test backend connection on mount
+  // Test backend connection on mount with timeout
   useEffect(() => {
     const testConnection = async () => {
       try {
         console.log('🔍 Testing backend connection...');
-        const isConnected = await testBackendConnection();
+        
+        // Set a shorter timeout for the initial connection test
+        const timeoutPromise = new Promise<boolean>((_, reject) => {
+          setTimeout(() => reject(new Error('Connection test timeout')), 2000); // 2 second timeout
+        });
+        
+        const connectionPromise = testBackendConnection();
+        
+        const isConnected = await Promise.race([connectionPromise, timeoutPromise]);
+        
         if (isConnected) {
           setBackendStatus('connected');
           setBackendError(null);
           console.log('✅ Backend connection successful');
         } else {
           setBackendStatus('failed');
-          setBackendError('Backend health check failed');
-          console.log('❌ Backend connection failed');
+          setBackendError('Backend health check failed - continuing in offline mode');
+          console.log('❌ Backend connection failed - continuing in offline mode');
         }
       } catch (error) {
         setBackendStatus('failed');
-        setBackendError(error instanceof Error ? error.message : 'Unknown error');
-        console.error('❌ Backend connection test error:', error);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        setBackendError(`${errorMsg} - continuing in offline mode`);
+        console.log('❌ Backend connection test error - continuing in offline mode:', error);
       }
     };
 

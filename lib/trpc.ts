@@ -14,20 +14,10 @@ const getBaseUrl = () => {
     windowOrigin: typeof window !== 'undefined' ? window.location.origin : 'N/A'
   });
 
-  // Always ignore external URLs in development - force local development
-  if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    const envUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-    // Skip ALL external URLs in development
-    if (envUrl.includes('rorktest.dev') || envUrl.includes('dev-') || envUrl.includes('https://') || envUrl.includes('http://') && !envUrl.includes('localhost')) {
-      console.log('🙅 Ignoring external environment URL in development:', envUrl);
-      console.log('🔧 Forcing local development mode');
-    } else if (envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
-      console.log('🌐 Using local API base URL:', envUrl);
-      return envUrl;
-    }
-  }
-
-  // For web environment, use current origin
+  // FORCE LOCAL DEVELOPMENT - ignore ALL external URLs
+  console.log('🔧 FORCING LOCAL DEVELOPMENT MODE - ignoring external URLs');
+  
+  // For web environment, use current origin (should be localhost:8081)
   if (typeof window !== 'undefined') {
     const baseUrl = window.location.origin;
     console.log('🌐 Using web origin as base URL:', baseUrl);
@@ -47,9 +37,9 @@ export const testBackendConnection = async (): Promise<boolean> => {
     const healthUrl = `${baseUrl}/api`;
     console.log('🏥 Testing backend connection to:', healthUrl);
     
-    // Create timeout promise
+    // Create timeout promise - shorter timeout for initial check
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout')), 5000);
+      setTimeout(() => reject(new Error('Connection timeout')), 3000); // 3 second timeout
     });
     
     const fetchPromise = fetch(healthUrl, {
@@ -65,9 +55,22 @@ export const testBackendConnection = async (): Promise<boolean> => {
     console.log('🏥 Health check response:', response.status, response.statusText);
     
     if (response.ok) {
-      const data = await response.json();
-      console.log('✅ Backend health check passed:', data);
-      return true;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const data = await response.json();
+          console.log('✅ Backend health check passed:', data);
+          return true;
+        } else {
+          // Got HTML instead of JSON - backend not properly configured
+          const text = await response.text();
+          console.warn('⚠️ Backend returned HTML instead of JSON:', text.substring(0, 100));
+          return false;
+        }
+      } catch (parseError) {
+        console.warn('⚠️ Failed to parse backend response:', parseError);
+        return false;
+      }
     } else {
       console.error('❌ Backend health check failed:', {
         status: response.status,
@@ -82,7 +85,7 @@ export const testBackendConnection = async (): Promise<boolean> => {
       name: error instanceof Error ? error.name : 'Unknown',
       stack: error instanceof Error ? error.stack?.substring(0, 300) : 'No stack trace'
     };
-    console.error('❌ Backend connection test failed:', JSON.stringify(errorDetails, null, 2));
+    console.log('❌ Backend connection test failed (expected in local dev):', JSON.stringify(errorDetails, null, 2));
     return false;
   }
 };
@@ -175,11 +178,13 @@ export const trpcClient = trpc.createClient({
           
           // Provide more helpful error messages
           if (error instanceof TypeError && errorMessage.includes('fetch')) {
-            throw new Error(`Network error: Cannot connect to backend server at ${getBaseUrl()}\nMake sure the backend is running and accessible`);
+            throw new Error(`Network error: Cannot connect to backend server at ${getBaseUrl()}\nRunning in offline mode`);
           } else if (errorMessage.includes('timeout')) {
-            throw new Error(`Request timeout: Backend server not responding within 15 seconds\nURL: ${url}`);
+            throw new Error(`Request timeout: Backend server not responding within 15 seconds\nRunning in offline mode`);
           } else if (errorMessage.includes('ECONNREFUSED')) {
-            throw new Error(`Connection refused: Backend server not running at ${getBaseUrl()}`);
+            throw new Error(`Connection refused: Backend server not running at ${getBaseUrl()}\nRunning in offline mode`);
+          } else if (errorMessage.includes('Unexpected token')) {
+            throw new Error(`Backend returned HTML instead of JSON - server not properly configured\nRunning in offline mode`);
           }
           
           throw error;

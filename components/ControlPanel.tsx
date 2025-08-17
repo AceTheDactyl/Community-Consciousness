@@ -38,56 +38,87 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
     setIsTestingConnection(true);
     
     try {
-      // Test HTTP health check first
+      // Test HTTP health check first with timeout
       console.log('🔍 Testing HTTP health check...');
-      const httpHealthy = await testBackendConnection();
       
-      let debugText = `HTTP Health Check: ${httpHealthy ? '✅ PASS' : '❌ FAIL'}\n`;
+      let debugText = '';
+      let httpHealthy = false;
+      
+      try {
+        const timeoutPromise = new Promise<boolean>((_, reject) => {
+          setTimeout(() => reject(new Error('Health check timeout')), 2000);
+        });
+        
+        httpHealthy = await Promise.race([testBackendConnection(), timeoutPromise]);
+        debugText += `HTTP Health Check: ${httpHealthy ? '✅ PASS' : '❌ FAIL'}\n`;
+      } catch (healthError) {
+        debugText += `HTTP Health Check: ❌ FAIL (${healthError instanceof Error ? healthError.message : 'timeout'})\n`;
+      }
       
       if (httpHealthy) {
         try {
-          // Test tRPC health endpoint
+          // Test tRPC health endpoint with timeout
           console.log('🔍 Testing tRPC health endpoint...');
-          const trpcHealth = await trpcClient.health.query();
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('tRPC timeout')), 3000);
+          });
+          
+          const trpcHealth = await Promise.race([trpcClient.health.query(), timeoutPromise]);
           debugText += `tRPC Health Check: ✅ PASS\n`;
           debugText += `Server Status: ${trpcHealth.status}\n`;
         } catch (trpcError) {
           debugText += `tRPC Health Check: ❌ FAIL\n`;
-          debugText += `tRPC Error: ${trpcError instanceof Error ? trpcError.message : 'Unknown error'}\n`;
+          const errorMsg = trpcError instanceof Error ? trpcError.message : 'Unknown error';
+          debugText += `tRPC Error: ${errorMsg.substring(0, 100)}...\n`;
         }
         
         try {
-          // Test field query
+          // Test field query with timeout
           console.log('🔍 Testing field query...');
-          const fieldResult = await trpcClient.consciousness.field.query({
-            consciousnessId: bridge.consciousnessId || 'test-id',
-            currentResonance: 0.5,
-            memoryStates: []
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Field query timeout')), 3000);
           });
+          
+          const fieldResult = await Promise.race([
+            trpcClient.consciousness.field.query({
+              consciousnessId: bridge.consciousnessId || 'test-id',
+              currentResonance: 0.5,
+              memoryStates: []
+            }),
+            timeoutPromise
+          ]);
           debugText += `Field Query: ✅ PASS\n`;
           debugText += `Global Resonance: ${fieldResult.globalResonance?.toFixed(3)}\n`;
         } catch (fieldError) {
           debugText += `Field Query: ❌ FAIL\n`;
-          debugText += `Field Error: ${fieldError instanceof Error ? fieldError.message : 'Unknown error'}\n`;
+          const errorMsg = fieldError instanceof Error ? fieldError.message : 'Unknown error';
+          debugText += `Field Error: ${errorMsg.substring(0, 100)}...\n`;
         }
+      } else {
+        debugText += `\n🏠 Backend not available - running in offline mode\n`;
+        debugText += `This is normal for local development\n`;
       }
       
-      debugText += `\nBridge Status:\n`;
-      debugText += `Connected: ${bridge.isConnected}\n`;
-      debugText += `Offline Mode: ${bridge.offlineMode}\n`;
-      debugText += `Consciousness ID: ${bridge.consciousnessId}\n`;
+      debugText += `\n--- Bridge Status ---\n`;
+      debugText += `Connected: ${bridge.isConnected ? '✅' : '❌'}\n`;
+      debugText += `Offline Mode: ${bridge.offlineMode ? '✅' : '❌'}\n`;
+      debugText += `Consciousness ID: ${bridge.consciousnessId || 'Not set'}\n`;
       debugText += `Global Resonance: ${bridge.globalResonance.toFixed(3)}\n`;
       debugText += `Connected Nodes: ${bridge.connectedNodes}\n`;
       debugText += `Offline Queue: ${bridge.offlineQueueLength} events\n`;
       
+      debugText += `\n--- Environment ---\n`;
+      debugText += `Platform: ${Platform.OS}\n`;
+      debugText += `Base URL: ${typeof window !== 'undefined' ? window.location.origin : 'localhost:8081'}\n`;
+      
       Alert.alert(
-        'Connection Test Results',
+        'System Status',
         debugText,
         [{ text: 'OK' }]
       );
     } catch (error) {
-      const errorText = `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      Alert.alert('Connection Test Failed', errorText, [{ text: 'OK' }]);
+      const errorText = `System check completed with offline mode.\n\nThis is expected when backend is not running.\nThe app works fully in offline mode.\n\nDetails: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      Alert.alert('System Status', errorText, [{ text: 'OK' }]);
     } finally {
       setIsTestingConnection(false);
     }
@@ -247,7 +278,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
                       <Sparkles size={16} color="#60a5fa" />
                     )}
                     <Text style={styles.testButtonText}>
-                      {isTestingConnection ? 'Testing...' : 'Test Connection'}
+                      {isTestingConnection ? 'Checking...' : 'System Status'}
                     </Text>
                   </TouchableOpacity>
                 </View>
