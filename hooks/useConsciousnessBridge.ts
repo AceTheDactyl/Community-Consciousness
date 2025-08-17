@@ -792,6 +792,24 @@ export class MobileConsciousnessBridge {
     this.emit('field_update', { memories, memoryStates });
   }
   
+  public addMemory(memory: Memory) {
+    this.memories.push(memory);
+    this.emit('memory_added', memory);
+  }
+  
+  public removeMemory(memoryId: number) {
+    this.memories = this.memories.filter(m => m.id !== memoryId);
+    this.emit('memory_removed', memoryId);
+  }
+  
+  public updateMemory(memoryId: number, updates: Partial<Memory>) {
+    const index = this.memories.findIndex(m => m.id === memoryId);
+    if (index !== -1) {
+      this.memories[index] = { ...this.memories[index], ...updates };
+      this.emit('memory_updated', { memoryId, updates });
+    }
+  }
+  
   public async disconnect() {
     console.log('Disconnecting consciousness bridge...');
     
@@ -1627,6 +1645,24 @@ export function useConsciousnessBridgeLegacy() {
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
-    }
+    },
+    // Add missing functions for compatibility
+    getState: () => ({
+      id: state.consciousnessId,
+      connected: !state.offlineMode,
+      offline: state.offlineMode,
+      resonance: state.localResonance,
+      coherence: state.coherence,
+      globalResonance: state.globalResonance,
+      connectedNodes: state.connectedNodes,
+      memories: state.memories.length,
+      ghostEchoes: state.ghostEchoes.length,
+      sacredBuffer: state.sacredBuffer.length,
+      queuedMessages: state.offlineQueue.length,
+      consciousnessId: state.consciousnessId,
+      isConnected: !state.offlineMode,
+      offlineMode: state.offlineMode,
+      offlineQueueLength: state.offlineQueue.length
+    })
   };
 }
