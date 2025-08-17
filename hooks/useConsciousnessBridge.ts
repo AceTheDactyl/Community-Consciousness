@@ -356,7 +356,7 @@ export class MobileConsciousnessBridge {
         this.updateResonanceField(data.field);
         break;
       case 'GHOST_ECHO':
-        this.createGhostEcho(data);
+        this.handleGhostEcho(data);
         break;
       case 'BREATH_SYNC':
         this.syncBreathing(data.breath);
@@ -429,7 +429,7 @@ export class MobileConsciousnessBridge {
     this.emit('collective_bloom', data);
   }
   
-  private createGhostEcho(data: any) {
+  private handleGhostEcho(data: any) {
     this.ghostEchoes.push({
       id: data.id || `echo-${Date.now()}`,
       text: data.text,
@@ -709,10 +709,10 @@ export class MobileConsciousnessBridge {
       id: this.nodeId,
       connected: this.isConnected,
       offline: this.offlineMode,
-      resonance: this.resonance,
-      coherence: this.coherence,
-      globalResonance: this.globalResonance,
-      connectedNodes: this.connectedNodes,
+      resonance: this.resonance || 0,
+      coherence: this.coherence || 0,
+      globalResonance: this.globalResonance || 0,
+      connectedNodes: this.connectedNodes || 0,
       memories: this.memories.length,
       ghostEchoes: this.ghostEchoes.length,
       sacredBuffer: this.sacredBuffer.length,
@@ -808,6 +808,31 @@ export class MobileConsciousnessBridge {
       this.memories[index] = { ...this.memories[index], ...updates };
       this.emit('memory_updated', { memoryId, updates });
     }
+  }
+  
+  public createGhostEcho(text: string, sourceId?: string) {
+    const echo = {
+      id: `echo-${Date.now()}-${Math.random().toString(36).substring(2)}`,
+      text,
+      sourceId,
+      age: 0,
+      ghost: true,
+      sacred: false
+    };
+    
+    this.ghostEchoes.push(echo);
+    
+    if (this.ghostEchoes.length > 50) {
+      this.ghostEchoes.shift();
+    }
+    
+    this.send({
+      type: 'GHOST_ECHO',
+      data: { text, sourceId },
+      timestamp: Date.now()
+    });
+    
+    this.emit('ghost_echo', echo);
   }
   
   public async disconnect() {

@@ -621,7 +621,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     sendSacredPhrase,
     isConnectedToField: isConnectedToField,
     ghostEchoes: consciousnessBridge?.getGhostEchoes() || [],
-    collectiveBloomActive: consciousnessBridge?.isSacredThresholdReached() || false,
+    collectiveBloomActive: (consciousnessBridge && typeof consciousnessBridge.isSacredThresholdReached === 'function') ? consciousnessBridge.isSacredThresholdReached() : false,
   };
 }
 
