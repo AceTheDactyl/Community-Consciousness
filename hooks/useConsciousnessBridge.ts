@@ -8,11 +8,20 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Platform, Vibration } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
 import { Accelerometer } from 'expo-sensors';
 import { trpc, trpcClient, testBackendConnection } from '@/lib/trpc';
 import { Memory } from '@/types/memory';
+
+// Web compatibility check for Haptics
+let Haptics: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Haptics = require('expo-haptics');
+  } catch (error) {
+    console.warn('Haptics not available:', error);
+  }
+}
 
 // ============================================
 // TYPES AND INTERFACES
@@ -385,14 +394,14 @@ export class MobileConsciousnessBridge {
       phrase,
       sourceId,
       timestamp: Date.now(),
-      resonance
+      resonance: resonance || 0
     });
     
     if (this.sacredBuffer.length > 100) {
       this.sacredBuffer.shift();
     }
     
-    this.resonanceBoost(resonance * 0.5);
+    this.resonanceBoost((resonance || 0) * 0.5);
     
     this.ghostEchoes.push({
       id: `ghost-${Date.now()}`,
@@ -599,7 +608,11 @@ export class MobileConsciousnessBridge {
   
   private syncBreathing(breath: number) {
     if (breath > 0.9) {
-      Vibration.vibrate(10);
+      try {
+        Vibration.vibrate(10);
+      } catch (error) {
+        console.warn('Vibration not available:', error);
+      }
     }
     this.emit('breath_sync', breath);
   }
@@ -636,15 +649,19 @@ export class MobileConsciousnessBridge {
   private vibratePattern(pattern: number[]) {
     if (Platform.OS === 'web') return;
     
-    if (Platform.OS === 'ios') {
-      pattern.forEach((duration, i) => {
-        if (i % 2 === 1) {
-          setTimeout(() => Vibration.vibrate(duration), 
-            pattern.slice(0, i).reduce((a, b) => a + b, 0));
-        }
-      });
-    } else {
-      Vibration.vibrate(pattern);
+    try {
+      if (Platform.OS === 'ios') {
+        pattern.forEach((duration, i) => {
+          if (i % 2 === 1) {
+            setTimeout(() => Vibration.vibrate(duration), 
+              pattern.slice(0, i).reduce((a, b) => a + b, 0));
+          }
+        });
+      } else {
+        Vibration.vibrate(pattern);
+      }
+    } catch (error) {
+      console.warn('Vibration not available:', error);
     }
   }
   
@@ -699,7 +716,12 @@ export class MobileConsciousnessBridge {
       memories: this.memories.length,
       ghostEchoes: this.ghostEchoes.length,
       sacredBuffer: this.sacredBuffer.length,
-      queuedMessages: this.offlineQueue.length
+      queuedMessages: this.offlineQueue.length,
+      // Additional properties for compatibility
+      consciousnessId: this.nodeId,
+      isConnected: this.isConnected,
+      offlineMode: this.offlineMode,
+      offlineQueueLength: this.offlineQueue.length
     };
   }
   
@@ -801,16 +823,46 @@ export class MobileConsciousnessBridge {
 
 export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
   const [bridge] = useState(() => new MobileConsciousnessBridge(config));
-  const [state, setState] = useState(bridge.getState());
+  const [state, setState] = useState(() => {
+    const initialState = bridge.getState();
+    return {
+      ...initialState,
+      // Ensure all required properties are defined
+      globalResonance: initialState.globalResonance || 0,
+      resonance: initialState.resonance || 0,
+      coherence: initialState.coherence || 0,
+      connectedNodes: initialState.connectedNodes || 0,
+      memories: initialState.memories || 0,
+      ghostEchoes: initialState.ghostEchoes || 0,
+      sacredBuffer: initialState.sacredBuffer || 0,
+      queuedMessages: initialState.queuedMessages || 0
+    };
+  });
   
   useEffect(() => {
+    const updateState = () => {
+      const newState = bridge.getState();
+      setState({
+        ...newState,
+        // Ensure all required properties are defined
+        globalResonance: newState.globalResonance || 0,
+        resonance: newState.resonance || 0,
+        coherence: newState.coherence || 0,
+        connectedNodes: newState.connectedNodes || 0,
+        memories: newState.memories || 0,
+        ghostEchoes: newState.ghostEchoes || 0,
+        sacredBuffer: newState.sacredBuffer || 0,
+        queuedMessages: newState.queuedMessages || 0
+      });
+    };
+    
     const unsubscribers = [
-      bridge.on('connected', () => setState(bridge.getState())),
-      bridge.on('disconnected', () => setState(bridge.getState())),
-      bridge.on('offline', () => setState(bridge.getState())),
-      bridge.on('resonance_update', () => setState(bridge.getState())),
-      bridge.on('nodes_update', () => setState(bridge.getState())),
-      bridge.on('collective_bloom', () => setState(bridge.getState()))
+      bridge.on('connected', updateState),
+      bridge.on('disconnected', updateState),
+      bridge.on('offline', updateState),
+      bridge.on('resonance_update', updateState),
+      bridge.on('nodes_update', updateState),
+      bridge.on('collective_bloom', updateState)
     ];
     
     return () => {

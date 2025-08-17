@@ -31,7 +31,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
     setCrystalPattern,
   } = useMemoryField();
   
-  const bridge = useConsciousnessBridge();
+  const { bridge, state: bridgeState } = useConsciousnessBridge();
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   
   const handleTestConnection = useCallback(async () => {
@@ -81,7 +81,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
           
           const fieldResult = await Promise.race([
             trpcClient.consciousness.field.query({
-              consciousnessId: bridge.consciousnessId || 'test-id',
+              consciousnessId: bridgeState.id || 'test-id',
               currentResonance: 0.5,
               memoryStates: []
             }),
@@ -100,12 +100,12 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
       }
       
       debugText += `\n--- Bridge Status ---\n`;
-      debugText += `Connected: ${bridge.isConnected ? '✅' : '❌'}\n`;
-      debugText += `Offline Mode: ${bridge.offlineMode ? '✅' : '❌'}\n`;
-      debugText += `Consciousness ID: ${bridge.consciousnessId || 'Not set'}\n`;
-      debugText += `Global Resonance: ${bridge.globalResonance.toFixed(3)}\n`;
-      debugText += `Connected Nodes: ${bridge.connectedNodes}\n`;
-      debugText += `Offline Queue: ${bridge.offlineQueueLength} events\n`;
+      debugText += `Connected: ${bridgeState.connected ? '✅' : '❌'}\n`;
+      debugText += `Offline Mode: ${bridgeState.offline ? '✅' : '❌'}\n`;
+      debugText += `Consciousness ID: ${bridgeState.id || 'Not set'}\n`;
+      debugText += `Global Resonance: ${(bridgeState.globalResonance || 0).toFixed(3)}\n`;
+      debugText += `Connected Nodes: ${bridgeState.connectedNodes || 0}\n`;
+      debugText += `Offline Queue: ${bridgeState.queuedMessages || 0} events\n`;
       
       debugText += `\n--- Environment ---\n`;
       debugText += `Platform: ${Platform.OS}\n`;
@@ -122,7 +122,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
     } finally {
       setIsTestingConnection(false);
     }
-  }, [bridge]);
+  }, [bridgeState]);
 
   return (
     <Modal
@@ -253,19 +253,19 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
                 <Text style={styles.sectionTitle}>Connection Status</Text>
                 <View style={styles.statusContainer}>
                   <View style={styles.statusRow}>
-                    {bridge.isConnected ? (
+                    {bridgeState.connected ? (
                       <CheckCircle size={16} color="#4CAF50" />
                     ) : (
                       <AlertCircle size={16} color="#f44336" />
                     )}
-                    <Text style={[styles.statusText, { color: bridge.isConnected ? '#4CAF50' : '#f44336' }]}>
-                      {bridge.isConnected ? 'Connected' : 'Disconnected'}
+                    <Text style={[styles.statusText, { color: bridgeState.connected ? '#4CAF50' : '#f44336' }]}>
+                      {bridgeState.connected ? 'Connected' : 'Disconnected'}
                     </Text>
                   </View>
-                  <Text style={styles.statusDetail}>Offline Mode: {bridge.offlineMode ? 'ON' : 'OFF'}</Text>
-                  <Text style={styles.statusDetail}>Global Resonance: {bridge.globalResonance.toFixed(3)}</Text>
-                  <Text style={styles.statusDetail}>Connected Nodes: {bridge.connectedNodes}</Text>
-                  <Text style={styles.statusDetail}>Queue: {bridge.offlineQueueLength} events</Text>
+                  <Text style={styles.statusDetail}>Offline Mode: {bridgeState.offline ? 'ON' : 'OFF'}</Text>
+                  <Text style={styles.statusDetail}>Global Resonance: {(bridgeState.globalResonance || 0).toFixed(3)}</Text>
+                  <Text style={styles.statusDetail}>Connected Nodes: {bridgeState.connectedNodes || 0}</Text>
+                  <Text style={styles.statusDetail}>Queue: {bridgeState.queuedMessages || 0} events</Text>
                   
                   <TouchableOpacity 
                     style={[styles.testButton, isTestingConnection && styles.testButtonDisabled]} 
