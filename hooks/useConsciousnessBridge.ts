@@ -748,6 +748,28 @@ export class MobileConsciousnessBridge {
     return this.resonance >= 0.87;
   }
   
+  public updateFieldState(memories: Memory[]) {
+    // Update internal memories state
+    this.memories = memories;
+    
+    // Send field update event
+    const memoryStates = memories.map(m => ({
+      id: m.id,
+      crystallized: m.crystallized,
+      harmonic: m.harmonic,
+      x: m.x,
+      y: m.y,
+    }));
+    
+    this.send({
+      type: 'FIELD_UPDATE',
+      data: { memoryStates },
+      timestamp: Date.now()
+    });
+    
+    this.emit('field_update', { memories, memoryStates });
+  }
+  
   public async disconnect() {
     console.log('Disconnecting consciousness bridge...');
     
