@@ -721,6 +721,12 @@ export default function CrystalMemoryField() {
               <Text style={styles.infoText}>Running in offline mode - local consciousness simulation</Text>
             </View>
           )}
+          {backendStatus === 'failed' && (
+            <View style={styles.infoItem}>
+              <AlertCircle size={12} color="#fbbf24" />
+              <Text style={styles.infoText}>Backend not connected - start with: bun run backend/server.ts</Text>
+            </View>
+          )}
         </View>
       )}
     </View>

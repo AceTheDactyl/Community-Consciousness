@@ -177,14 +177,14 @@ export const trpcClient = trpc.createClient({
           console.error('❌ tRPC fetch error:', JSON.stringify(errorDetails, null, 2));
           
           // Provide more helpful error messages
-          if (error instanceof TypeError && errorMessage.includes('fetch')) {
-            throw new Error(`Network error: Cannot connect to backend server at ${getBaseUrl()}\nRunning in offline mode`);
+          if (error instanceof TypeError && errorMessage.includes('Failed to fetch')) {
+            throw new Error(`Network error: Cannot connect to backend server at ${getBaseUrl()}\nMake sure the backend is running and accessible`);
           } else if (errorMessage.includes('timeout')) {
-            throw new Error(`Request timeout: Backend server not responding within 15 seconds\nRunning in offline mode`);
+            throw new Error(`Request timeout: Backend server not responding within 15 seconds\nMake sure the backend is running and accessible`);
           } else if (errorMessage.includes('ECONNREFUSED')) {
-            throw new Error(`Connection refused: Backend server not running at ${getBaseUrl()}\nRunning in offline mode`);
+            throw new Error(`Connection refused: Backend server not running at ${getBaseUrl()}\nMake sure the backend is running and accessible`);
           } else if (errorMessage.includes('Unexpected token')) {
-            throw new Error(`Backend returned HTML instead of JSON - server not properly configured\nRunning in offline mode`);
+            throw new Error(`Backend returned HTML instead of JSON - server not properly configured\nMake sure the backend is running and accessible`);
           }
           
           throw error;
