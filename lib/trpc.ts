@@ -14,14 +14,15 @@ const getBaseUrl = () => {
     windowOrigin: typeof window !== 'undefined' ? window.location.origin : 'N/A'
   });
 
-  // Check for environment variable but ignore external URLs in development
+  // Always ignore external URLs in development - force local development
   if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
     const envUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-    // Skip external URLs that might not be accessible
-    if (envUrl.includes('rorktest.dev') || envUrl.includes('dev-')) {
+    // Skip ALL external URLs in development
+    if (envUrl.includes('rorktest.dev') || envUrl.includes('dev-') || envUrl.includes('https://') || envUrl.includes('http://') && !envUrl.includes('localhost')) {
       console.log('🙅 Ignoring external environment URL in development:', envUrl);
-    } else {
-      console.log('🌐 Using configured API base URL:', envUrl);
+      console.log('🔧 Forcing local development mode');
+    } else if (envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+      console.log('🌐 Using local API base URL:', envUrl);
       return envUrl;
     }
   }

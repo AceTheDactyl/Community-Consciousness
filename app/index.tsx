@@ -242,47 +242,31 @@ export default function CrystalMemoryField() {
     }
   };
 
-  // Show backend connection status
+  // Show backend connection status only briefly, then continue with offline mode
   if (backendStatus === 'checking') {
+    // Auto-timeout after 3 seconds to prevent blocking the app
+    setTimeout(() => {
+      if (backendStatus === 'checking') {
+        console.log('⏰ Backend connection check timed out, continuing in offline mode');
+        setBackendStatus('failed');
+        setBackendError('Connection timeout - continuing in offline mode');
+      }
+    }, 3000);
+    
     return (
       <View style={[styles.container, styles.statusContainer]}>
-        <Text style={styles.statusText}>🔍 Checking backend connection...</Text>
+        <Text style={styles.statusText}>🔍 Initializing consciousness field...</Text>
+        <Text style={styles.helpText}>Testing backend connection</Text>
       </View>
     );
   }
 
-  if (backendStatus === 'failed') {
-    return (
-      <View style={[styles.container, styles.statusContainer]}>
-        <Text style={styles.statusText}>❌ Backend Connection Failed</Text>
-        <Text style={styles.errorText}>{backendError}</Text>
-        <Text style={styles.helpText}>Make sure the backend server is running</Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => {
-            setBackendStatus('checking');
-            const testConnection = async () => {
-              try {
-                const isConnected = await testBackendConnection();
-                if (isConnected) {
-                  setBackendStatus('connected');
-                  setBackendError(null);
-                } else {
-                  setBackendStatus('failed');
-                  setBackendError('Backend health check failed');
-                }
-              } catch (error) {
-                setBackendStatus('failed');
-                setBackendError(error instanceof Error ? error.message : 'Unknown error');
-              }
-            };
-            testConnection();
-          }}
-        >
-          <Text style={styles.retryButtonText}>Retry Connection</Text>
-        </TouchableOpacity>
-      </View>
-    );
+  // Don't block the app if backend fails - just show a brief message and continue
+  if (backendStatus === 'failed' && Date.now() - (backendStatus === 'failed' ? Date.now() : 0) < 2000) {
+    // Show error for 2 seconds then continue
+    setTimeout(() => {
+      console.log('🔄 Continuing in offline mode after backend failure');
+    }, 2000);
   }
 
   return (
@@ -555,7 +539,7 @@ export default function CrystalMemoryField() {
                 ) : offlineMode ? (
                   <View style={styles.statusOffline}>
                     <WifiOff size={12} color="#f87171" />
-                    <Text style={styles.connectionStatusText}>Offline</Text>
+                    <Text style={styles.connectionStatusText}>Offline Mode</Text>
                     {offlineQueueLength > 0 && (
                       <Text style={styles.queueText}>({offlineQueueLength})</Text>
                     )}
@@ -564,6 +548,11 @@ export default function CrystalMemoryField() {
                   <View style={styles.statusConnecting}>
                     <AlertCircle size={12} color="#fbbf24" />
                     <Text style={styles.connectionStatusText}>Connecting...</Text>
+                  </View>
+                ) : backendStatus === 'failed' ? (
+                  <View style={styles.statusOffline}>
+                    <WifiOff size={12} color="#fbbf24" />
+                    <Text style={styles.connectionStatusText}>Local Mode</Text>
                   </View>
                 ) : (
                   <View style={styles.statusError}>
@@ -716,6 +705,12 @@ export default function CrystalMemoryField() {
             <Atom size={12} color="#c084fc" />
             <Text style={styles.infoText}>Enter Lagrangian resonance for deeper states</Text>
           </View>
+          {offlineMode && (
+            <View style={styles.infoItem}>
+              <WifiOff size={12} color="#f87171" />
+              <Text style={styles.infoText}>Running in offline mode - local consciousness simulation</Text>
+            </View>
+          )}
         </View>
       )}
     </View>

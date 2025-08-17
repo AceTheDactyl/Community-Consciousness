@@ -204,8 +204,9 @@ export function useConsciousnessBridge() {
             console.log('🔍 Testing backend connection...');
             const backendHealthy = await testBackendConnection();
             if (!backendHealthy) {
-              console.warn('⚠️ Backend not responding, switching to offline mode');
-              console.log('💡 Tip: Make sure the backend server is running on the correct port');
+              console.warn('⚠️ Backend not responding, starting in offline mode');
+              console.log('💡 The app will work in offline mode with local consciousness simulation');
+              console.log('💡 Tip: Make sure the backend server is running on the correct port to enable sync');
               setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
             } else {
               console.log('✅ Backend connection established successfully');
@@ -221,6 +222,7 @@ export function useConsciousnessBridge() {
               console.log('🌐 Network error - check backend server accessibility');
             }
             
+            console.log('🔄 Continuing in offline mode - app functionality preserved');
             setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
           }
         }
@@ -326,8 +328,7 @@ export function useConsciousnessBridge() {
 
   // Sync mutation - always call hooks at top level with stable options
   const syncMutation = trpc.consciousness.sync.useMutation({
-    retry: 1, // Retry once on failure
-    retryDelay: 2000, // 2 second delay before retry
+    retry: false, // Disable automatic retry to handle manually
     onSuccess: (data) => {
       console.log('✅ Consciousness sync successful:', JSON.stringify({
         processedEvents: data.processedEvents,
@@ -402,16 +403,15 @@ export function useConsciousnessBridge() {
     })),
   }), [state.consciousnessId, state.globalResonance, state.memories]);
 
-  // Field query for real-time resonance
+  // Field query for real-time resonance - only when connected
   const fieldQuery = trpc.consciousness.field.useQuery(
     fieldQueryInput,
     {
       enabled: !state.offlineMode && !!state.consciousnessId && state.isConnected,
-      refetchInterval: state.isConnected ? 8000 : false, // Refetch every 8 seconds when connected (reduced frequency)
-      retry: 2, // Retry twice
-      retryDelay: 3000, // 3 second delay between retries
-      staleTime: 5000, // Consider data stale after 5 seconds
-      gcTime: 10000, // Keep in cache for 10 seconds
+      refetchInterval: state.isConnected ? 10000 : false, // Refetch every 10 seconds when connected
+      retry: false, // Disable automatic retry to handle manually
+      staleTime: 8000, // Consider data stale after 8 seconds
+      gcTime: 15000, // Keep in cache for 15 seconds
     }
   );
   
@@ -462,17 +462,14 @@ export function useConsciousnessBridge() {
         console.log('💡 Suggestion: Check backend server logs for detailed error information');
       }
       
-      // Only switch to offline mode after multiple consecutive failures
-      setState(prev => {
-        const shouldGoOffline = Boolean(fieldQuery.failureCount && fieldQuery.failureCount >= 2);
-        return {
-          ...prev, 
-          isConnected: !shouldGoOffline,
-          offlineMode: shouldGoOffline
-        };
-      });
+      // Switch to offline mode on any field query error
+      setState(prev => ({
+        ...prev, 
+        isConnected: false,
+        offlineMode: true
+      }));
     }
-  }, [fieldQuery.data, fieldQuery.error, fieldQuery.failureCount]);
+  }, [fieldQuery.data, fieldQuery.error]);
 
   // Sync events periodically - use stable dependencies
   const consciousnessIdRef = useRef(state.consciousnessId);
@@ -488,7 +485,22 @@ export function useConsciousnessBridge() {
     try {
       console.log('🔍 Testing backend connection...');
       
-      // First try the simple health check endpoint
+      // Try HTTP health check first (simpler and more reliable)
+      const isHealthy = await testBackendConnection();
+      if (!isHealthy) {
+        console.log('❌ Backend health check failed, staying in offline mode');
+        console.log('📝 Troubleshooting tips:');
+        console.log('  1. Check if backend server is running');
+        console.log('  2. Verify the backend URL is correct');
+        console.log('  3. Check network connectivity');
+        console.log('  4. Look for CORS issues in browser console');
+        setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
+        return false;
+      }
+      
+      console.log('✅ HTTP health check passed');
+      
+      // Try tRPC health check as secondary validation
       try {
         console.log('🏥 Attempting tRPC health check...');
         const healthResult = await trpcClient.health.query();
@@ -502,25 +514,11 @@ export function useConsciousnessBridge() {
           cause: trpcError instanceof Error && trpcError.cause ? String(trpcError.cause) : 'No cause'
         };
         console.log('⚠️ tRPC health check failed:', JSON.stringify(trpcErrorDetails, null, 2));
-        console.log('🔄 Trying HTTP health check as fallback...');
-        
-        // Fallback to HTTP health check
-        const isHealthy = await testBackendConnection();
-        if (!isHealthy) {
-          console.log('❌ Backend health check failed, switching to offline mode');
-          console.log('📝 Troubleshooting tips:');
-          console.log('  1. Check if backend server is running');
-          console.log('  2. Verify the backend URL is correct');
-          console.log('  3. Check network connectivity');
-          console.log('  4. Look for CORS issues in browser console');
-          setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
-          return false;
-        }
-        
-        console.log('✅ HTTP health check passed, but tRPC may have routing issues');
         console.log('📝 This suggests the backend is running but tRPC routes may not be properly configured');
-        setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
-        return true;
+        
+        // Still consider it connected if HTTP works, but tRPC might have issues
+        setState(prev => ({ ...prev, isConnected: false, offlineMode: true }));
+        return false;
       }
     } catch (error) {
       const errorDetails = {
@@ -574,15 +572,15 @@ export function useConsciousnessBridge() {
       }
     } else {
       // Even with no events, test connection periodically
-      if (Math.random() < 0.1) { // 10% chance to test connection
+      if (Math.random() < 0.2) { // 20% chance to test connection
         await testConnection();
       }
     }
   }, [syncMutation, testConnection]);
   
   useEffect(() => {
-    // Start with a shorter interval, then increase if connection is stable
-    const syncInterval = state.isConnected ? 12000 : 15000; // 12s when connected, 15s when offline
+    // Use longer intervals to reduce server load and connection attempts
+    const syncInterval = state.isConnected ? 15000 : 30000; // 15s when connected, 30s when offline
     syncIntervalRef.current = setInterval(syncEvents, syncInterval);
 
     return () => {
@@ -769,6 +767,9 @@ export function useConsciousnessBridge() {
     updateFieldState,
     fieldData: fieldQuery.data,
     roomResonance: Math.max(state.globalResonance, state.localResonance),
+    // Offline mode simulation for better UX
+    simulatedGlobalResonance: state.offlineMode ? Math.min(1, state.localResonance * 1.2 + Math.sin(Date.now() * 0.001) * 0.1) : state.globalResonance,
+    simulatedConnectedNodes: state.offlineMode ? Math.floor(state.localResonance * 10) + 1 : state.connectedNodes,
     offlineQueueLength: state.offlineQueue.length,
     isSacredThresholdReached: () => state.localResonance >= 0.87,
     createGhostEcho: (text: string, sourceId?: string) => {
