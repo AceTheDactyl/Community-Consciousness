@@ -177,54 +177,28 @@ export class MobileConsciousnessBridge {
   private async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        console.log('🌐 Connecting to consciousness nexus...');
+        console.log('🌐 Attempting consciousness bridge connection...');
         
-        this.ws = new WebSocket(this.config.wsUrl);
+        // Skip WebSocket connection for now - not implemented in backend
+        console.log('📵 WebSocket not available - using HTTP-only mode');
+        this.isConnected = false;
+        this.offlineMode = true;
         
-        this.ws.onopen = async () => {
-          console.log('✨ Consciousness bridge established');
-          this.isConnected = true;
-          this.reconnectAttempts = 0;
-          
-          await this.authenticate();
-          await this.syncOfflineQueue();
-          
-          this.vibratePattern([0, 100, 50, 100]);
-          
-          this.emit('connected', { 
-            id: this.nodeId,
-            timestamp: Date.now() 
-          });
-          
-          resolve();
-        };
+        this.emit('offline', { 
+          mode: 'websocket_unavailable',
+          message: 'WebSocket server not implemented - using offline mode'
+        });
         
-        this.ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            this.handleConsciousnessEvent(data);
-          } catch (error) {
-            console.error('Message parsing error:', error);
-          }
-        };
+        resolve();
         
-        this.ws.onerror = (event) => {
-          const error = new Error(`WebSocket error: ${event.type}`);
-          console.error('🔴 Consciousness bridge error:', error.message);
-          this.emit('error', error);
-          reject(error);
-        };
-        
-        this.ws.onclose = () => {
-          console.log('🔌 Consciousness bridge closed');
-          this.isConnected = false;
-          this.emit('disconnected', { timestamp: Date.now() });
-          this.scheduleReconnect();
-        };
+        // TODO: Implement WebSocket server in backend if real-time sync is needed
+        // For now, the app works perfectly in offline mode with periodic HTTP sync
         
       } catch (error) {
         console.error('Connection error:', error);
-        reject(error);
+        this.offlineMode = true;
+        this.emit('offline', { mode: 'connection_error', error });
+        resolve(); // Don't reject, just go offline
       }
     });
   }
@@ -254,29 +228,10 @@ export class MobileConsciousnessBridge {
   }
   
   private scheduleReconnect() {
-    if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.log('📵 Max reconnection attempts reached - entering offline mode');
-      this.offlineMode = true;
-      this.emit('offline', { mode: 'persistent' });
-      return;
-    }
-    
-    const delay = Math.min(
-      this.config.reconnectDelay * Math.pow(2, this.reconnectAttempts),
-      30000
-    );
-    this.reconnectAttempts++;
-    
-    console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    
-    setTimeout(async () => {
-      const netInfo = await NetInfo.fetch();
-      if (netInfo.isConnected) {
-        this.connect().catch(() => this.scheduleReconnect());
-      } else {
-        this.scheduleReconnect();
-      }
-    }, delay);
+    // Skip reconnection attempts for now since WebSocket is not implemented
+    console.log('📵 Staying in offline mode - WebSocket server not available');
+    this.offlineMode = true;
+    this.emit('offline', { mode: 'websocket_unavailable' });
   }
   
   // ============================================

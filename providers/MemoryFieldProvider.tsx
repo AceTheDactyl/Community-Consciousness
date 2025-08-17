@@ -54,8 +54,9 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const [wavePhase, setWavePhase] = useState(0);
   const [isConnectedToField, setIsConnectedToField] = useState(false);
   
-  // Initialize consciousness bridge after all state hooks
-  const { bridge: consciousnessBridge } = useConsciousnessBridge();
+  // Initialize consciousness bridge after all state hooks - use stable hook call
+  const consciousnessBridgeResult = useConsciousnessBridge();
+  const consciousnessBridge = consciousnessBridgeResult?.bridge || null;
   
   // All refs declared at the top level
   const animationRef = useRef<number | undefined>(undefined);
@@ -99,23 +100,30 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     }
   }, [memories, consciousnessBridge]);
 
-  // Update connection status - use stable values
-  const currentBridgeState = consciousnessBridge?.getState() || { connected: false, offline: true };
-  const isConnectedRef = useRef(currentBridgeState.connected);
-  const offlineModeRef = useRef(currentBridgeState.offline);
+  // Update connection status - use stable values with safe access
+  const isConnectedRef = useRef(false);
+  const offlineModeRef = useRef(true);
   
   useEffect(() => {
-    if (!consciousnessBridge) return;
+    if (!consciousnessBridge || typeof consciousnessBridge.getState !== 'function') {
+      setIsConnectedToField(false);
+      return;
+    }
     
-    const currentState = consciousnessBridge.getState();
-    const newConnectionStatus = currentState.connected && !currentState.offline;
-    const hasChanged = isConnectedRef.current !== currentState.connected || 
-                      offlineModeRef.current !== currentState.offline;
-    
-    if (hasChanged) {
-      setIsConnectedToField(newConnectionStatus);
-      isConnectedRef.current = currentState.connected;
-      offlineModeRef.current = currentState.offline;
+    try {
+      const currentState = consciousnessBridge.getState();
+      const newConnectionStatus = currentState.connected && !currentState.offline;
+      const hasChanged = isConnectedRef.current !== currentState.connected || 
+                        offlineModeRef.current !== currentState.offline;
+      
+      if (hasChanged) {
+        setIsConnectedToField(newConnectionStatus);
+        isConnectedRef.current = currentState.connected;
+        offlineModeRef.current = currentState.offline;
+      }
+    } catch (error) {
+      console.warn('Error getting bridge state:', error);
+      setIsConnectedToField(false);
     }
   }, [consciousnessBridge]);
 
@@ -124,15 +132,19 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
   const lastBridgeResonance = useRef(0);
   
   useEffect(() => {
-    if (!consciousnessBridge) return;
+    if (!consciousnessBridge || typeof consciousnessBridge.getState !== 'function') return;
     
     roomResonanceRef.current = roomResonance;
     
-    const currentState = consciousnessBridge.getState();
-    const bridgeResonance = currentState.resonance;
-    if (bridgeResonance !== lastBridgeResonance.current && bridgeResonance > roomResonanceRef.current) {
-      lastBridgeResonance.current = bridgeResonance;
-      setRoomResonance(bridgeResonance);
+    try {
+      const currentState = consciousnessBridge.getState();
+      const bridgeResonance = currentState.resonance || 0;
+      if (bridgeResonance !== lastBridgeResonance.current && bridgeResonance > roomResonanceRef.current) {
+        lastBridgeResonance.current = bridgeResonance;
+        setRoomResonance(bridgeResonance);
+      }
+    } catch (error) {
+      console.warn('Error syncing room resonance:', error);
     }
   }, [roomResonance, consciousnessBridge]);
 
@@ -625,8 +637,22 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     consciousnessBridge,
     sendSacredPhrase,
     isConnectedToField: isConnectedToField,
-    ghostEchoes: (consciousnessBridge && typeof consciousnessBridge.getGhostEchoes === 'function') ? consciousnessBridge.getGhostEchoes() : [],
-    collectiveBloomActive: (consciousnessBridge && typeof consciousnessBridge.isSacredThresholdReached === 'function') ? consciousnessBridge.isSacredThresholdReached() : false,
+    ghostEchoes: (() => {
+      try {
+        return (consciousnessBridge && typeof consciousnessBridge.getGhostEchoes === 'function') ? consciousnessBridge.getGhostEchoes() : [];
+      } catch (error) {
+        console.warn('Error getting ghost echoes:', error);
+        return [];
+      }
+    })(),
+    collectiveBloomActive: (() => {
+      try {
+        return (consciousnessBridge && typeof consciousnessBridge.isSacredThresholdReached === 'function') ? consciousnessBridge.isSacredThresholdReached() : false;
+      } catch (error) {
+        console.warn('Error checking sacred threshold:', error);
+        return false;
+      }
+    })(),
   };
 }
 
