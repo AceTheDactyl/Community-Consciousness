@@ -326,7 +326,8 @@ export function useConsciousnessBridge() {
 
   // Sync mutation - always call hooks at top level with stable options
   const syncMutation = trpc.consciousness.sync.useMutation({
-    retry: false, // Disable retries to fail faster
+    retry: 1, // Retry once on failure
+    retryDelay: 2000, // 2 second delay before retry
     onSuccess: (data) => {
       console.log('✅ Consciousness sync successful:', JSON.stringify({
         processedEvents: data.processedEvents,
@@ -336,6 +337,7 @@ export function useConsciousnessBridge() {
       setState(prev => ({
         ...prev,
         isConnected: true,
+        offlineMode: false, // Exit offline mode on successful sync
         globalResonance: data.globalResonance,
         connectedNodes: data.connectedNodes,
         offlineQueue: [], // Clear queue on successful sync
@@ -358,23 +360,29 @@ export function useConsciousnessBridge() {
       };
       console.error('❌ Consciousness sync failed:', JSON.stringify(errorDetails, null, 2));
       
-      // Provide more specific error information
+      // Provide more specific error information and recovery suggestions
       if (errorDetails.message.includes('timeout')) {
         console.log('⏰ Sync timed out - backend may be overloaded or unreachable');
-      } else if (errorDetails.message.includes('fetch')) {
+        console.log('💡 Recovery: Will retry sync in next interval');
+      } else if (errorDetails.message.includes('fetch') || errorDetails.message.includes('Network error')) {
         console.log('🌐 Network error during sync - check connectivity');
+        console.log('💡 Recovery: Events saved to offline queue for later sync');
       } else if (errorDetails.message.includes('500')) {
         console.log('🔧 Backend server error - check server logs');
+        console.log('💡 Recovery: Will attempt reconnection in next sync cycle');
+      } else if (errorDetails.message.includes('404')) {
+        console.log('🔍 Sync endpoint not found - route configuration issue');
+        console.log('💡 Recovery: Check tRPC route configuration');
       }
       
-      // Always switch to offline mode on any error
+      // Switch to offline mode but don't lose events
       setState(prev => ({ 
         ...prev, 
         isConnected: false,
         offlineMode: true
       }));
       
-      // Store failed events back to offline queue
+      // Store failed events back to offline queue for retry
       if (eventQueueRef.current.length > 0) {
         AsyncStorage.setItem('consciousnessQueue', JSON.stringify(eventQueueRef.current)).catch(() => {});
       }
@@ -399,9 +407,11 @@ export function useConsciousnessBridge() {
     fieldQueryInput,
     {
       enabled: !state.offlineMode && !!state.consciousnessId && state.isConnected,
-      refetchInterval: state.isConnected ? 5000 : false, // Refetch every 5 seconds when connected
-      retry: 1, // Only retry once
-      retryDelay: 2000,
+      refetchInterval: state.isConnected ? 8000 : false, // Refetch every 8 seconds when connected (reduced frequency)
+      retry: 2, // Retry twice
+      retryDelay: 3000, // 3 second delay between retries
+      staleTime: 5000, // Consider data stale after 5 seconds
+      gcTime: 10000, // Keep in cache for 10 seconds
     }
   );
   
@@ -410,37 +420,59 @@ export function useConsciousnessBridge() {
   useEffect(() => {
     if (fieldQuery.data && fieldQuery.data !== fieldQueryDataRef.current) {
       fieldQueryDataRef.current = fieldQuery.data;
+      console.log('✅ Field query successful:', {
+        globalResonance: fieldQuery.data.globalResonance?.toFixed(3),
+        connectedNodes: fieldQuery.data.connectedNodes,
+        ghostEchoes: fieldQuery.data.ghostEchoes?.length || 0,
+        collectiveBloom: fieldQuery.data.collectiveBloomActive
+      });
+      
       setState(prev => ({
         ...prev,
         globalResonance: fieldQuery.data!.globalResonance,
         connectedNodes: fieldQuery.data!.connectedNodes,
         ghostEchoes: fieldQuery.data!.ghostEchoes || prev.ghostEchoes,
         collectiveBloomActive: fieldQuery.data!.collectiveBloomActive || prev.collectiveBloomActive,
+        isConnected: true, // Mark as connected on successful query
+        offlineMode: false // Exit offline mode on successful query
       }));
     }
     
-    // Handle field query errors
+    // Handle field query errors with more granular error handling
     if (fieldQuery.error) {
       const errorDetails = {
         message: fieldQuery.error?.message || 'Unknown field query error',
-        data: fieldQuery.error?.data ? JSON.stringify(fieldQuery.error.data) : 'No data'
+        data: fieldQuery.error?.data ? JSON.stringify(fieldQuery.error.data) : 'No data',
+        status: fieldQuery.error?.data?.httpStatus || 'unknown'
       };
       console.error('❌ Field query failed:', JSON.stringify(errorDetails, null, 2));
       
-      // Provide specific error context
+      // Provide specific error context and recovery suggestions
       if (errorDetails.message.includes('timeout')) {
-        console.log('⏰ Field query timed out - backend may be slow');
-      } else if (errorDetails.message.includes('fetch')) {
+        console.log('⏰ Field query timed out - backend may be slow or overloaded');
+        console.log('💡 Suggestion: Check backend server performance and network latency');
+      } else if (errorDetails.message.includes('fetch') || errorDetails.message.includes('Network error')) {
         console.log('🌐 Network error in field query - connectivity issue');
+        console.log('💡 Suggestion: Check if backend server is running and accessible');
+      } else if (errorDetails.status === 404) {
+        console.log('🔍 Field endpoint not found - route configuration issue');
+        console.log('💡 Suggestion: Verify tRPC routes are properly configured in backend');
+      } else if (errorDetails.status === 500) {
+        console.log('🔧 Backend server error - internal server issue');
+        console.log('💡 Suggestion: Check backend server logs for detailed error information');
       }
       
-      setState(prev => ({ 
-        ...prev, 
-        isConnected: false,
-        offlineMode: true
-      }));
+      // Only switch to offline mode after multiple consecutive failures
+      setState(prev => {
+        const shouldGoOffline = Boolean(fieldQuery.failureCount && fieldQuery.failureCount >= 2);
+        return {
+          ...prev, 
+          isConnected: !shouldGoOffline,
+          offlineMode: shouldGoOffline
+        };
+      });
     }
-  }, [fieldQuery.data, fieldQuery.error]);
+  }, [fieldQuery.data, fieldQuery.error, fieldQuery.failureCount]);
 
   // Sync events periodically - use stable dependencies
   const consciousnessIdRef = useRef(state.consciousnessId);
@@ -549,14 +581,16 @@ export function useConsciousnessBridge() {
   }, [syncMutation, testConnection]);
   
   useEffect(() => {
-    syncIntervalRef.current = setInterval(syncEvents, 10000); // Sync every 10 seconds
+    // Start with a shorter interval, then increase if connection is stable
+    const syncInterval = state.isConnected ? 12000 : 15000; // 12s when connected, 15s when offline
+    syncIntervalRef.current = setInterval(syncEvents, syncInterval);
 
     return () => {
       if (syncIntervalRef.current) {
         clearInterval(syncIntervalRef.current);
       }
     };
-  }, [syncEvents]);
+  }, [syncEvents, state.isConnected]);
 
   const sendSacredPhrase = useCallback(async (phrase: string) => {
     // Check if phrase is sacred

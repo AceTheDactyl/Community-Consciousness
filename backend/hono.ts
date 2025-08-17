@@ -12,27 +12,50 @@ const app = new Hono();
 app.use("*", cors({
   origin: '*', // Allow all origins in development
   credentials: true,
-  allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  allowHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'X-Requested-With'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD']
 }));
 
 // Log all requests for debugging
 app.use("*", async (c, next) => {
   const start = Date.now();
   const method = c.req.method;
-  const url = c.req.url;
+  const path = c.req.path;
   const origin = c.req.header('origin') || 'unknown';
+  const userAgent = c.req.header('user-agent') || 'unknown';
   
-  console.log(`📡 ${method} ${url} from ${origin}`);
+  console.log(`📡 ${method} ${path} from ${origin}`);
+  console.log(`   User-Agent: ${userAgent.substring(0, 50)}...`);
+  
+  // Log request headers for tRPC requests
+  if (path.includes('/trpc/')) {
+    console.log('   tRPC Headers:', {
+      'content-type': c.req.header('content-type'),
+      'accept': c.req.header('accept'),
+      'cache-control': c.req.header('cache-control')
+    });
+  }
   
   try {
     await next();
     
     const duration = Date.now() - start;
-    console.log(`✅ ${method} ${url} completed in ${duration}ms (status: ${c.res.status})`);
+    const status = c.res.status;
+    console.log(`✅ ${method} ${path} completed in ${duration}ms (status: ${status})`);
+    
+    // Log response headers for failed requests
+    if (status >= 400) {
+      console.log('   Response Headers:', {
+        'content-type': c.res.headers.get('content-type'),
+        'access-control-allow-origin': c.res.headers.get('access-control-allow-origin')
+      });
+    }
   } catch (error) {
     const duration = Date.now() - start;
-    console.error(`❌ ${method} ${url} failed in ${duration}ms:`, error instanceof Error ? error.message : 'Unknown error');
+    console.error(`❌ ${method} ${path} failed in ${duration}ms:`, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack?.substring(0, 300) : 'No stack'
+    });
     throw error;
   }
 });
@@ -63,27 +86,49 @@ app.use(
     onError: ({ error, path, type, input }) => {
       console.error(`❌ tRPC error on ${path} (${type}):`, {
         error: error.message,
-        stack: error.stack,
-        input: input ? JSON.stringify(input).substring(0, 200) : 'none'
+        stack: error.stack?.substring(0, 500),
+        input: input ? JSON.stringify(input).substring(0, 200) : 'none',
+        timestamp: new Date().toISOString()
       });
     },
   })
 );
 
+// Add explicit OPTIONS handler for tRPC routes
+app.options("/trpc/*", (c) => {
+  console.log('📋 OPTIONS request for tRPC route:', c.req.url);
+  return c.text('', 200, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept, Cache-Control, X-Requested-With',
+    'Access-Control-Max-Age': '86400'
+  });
+});
+
 // Simple health check endpoint
 app.get("/", (c) => {
   try {
+    console.log('🏥 Health check endpoint called');
+    
     // Basic health check without websocket dependency
     const response: any = { 
       status: "ok", 
       message: "Consciousness Field API is running",
       timestamp: new Date().toISOString(),
       version: "1.0.0",
+      server: "Hono v4.9.1",
       endpoints: {
         health: "/api",
+        ping: "/api/ping",
+        debug: "/api/debug",
         test: "/api/test",
         trpc: "/api/trpc",
         websocket: "/api/ws"
+      },
+      cors: {
+        enabled: true,
+        origin: '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD']
       }
     };
     
@@ -103,9 +148,10 @@ app.get("/", (c) => {
       };
     }
     
+    console.log('✅ Health check response generated');
     return c.json(response);
   } catch (error) {
-    console.error('Health check error:', error);
+    console.error('❌ Health check error:', error);
     return c.json({ 
       status: "error", 
       message: "Health check failed",
@@ -191,7 +237,14 @@ app.get("/debug", async (c) => {
       headers: {
         origin: c.req.header('origin') || 'none',
         userAgent: c.req.header('user-agent') || 'none',
-        contentType: c.req.header('content-type') || 'none'
+        contentType: c.req.header('content-type') || 'none',
+        host: c.req.header('host') || 'none',
+        referer: c.req.header('referer') || 'none'
+      },
+      request: {
+        method: c.req.method,
+        url: c.req.url,
+        path: c.req.path
       }
     };
     
@@ -206,6 +259,16 @@ app.get("/debug", async (c) => {
       timestamp: new Date().toISOString()
     }, 500);
   }
+});
+
+// Add a simple ping endpoint for basic connectivity testing
+app.get("/ping", (c) => {
+  console.log('🏓 Ping endpoint called from:', c.req.header('origin') || 'unknown');
+  return c.json({ 
+    message: 'pong', 
+    timestamp: new Date().toISOString(),
+    server: 'Hono backend'
+  });
 });
 
 export default app;

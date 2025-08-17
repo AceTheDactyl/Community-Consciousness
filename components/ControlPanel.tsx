@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
-import { X, Sparkles } from 'lucide-react-native';
+import { X, Sparkles, Activity, CheckCircle, AlertCircle } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import CustomSlider from '@/components/CustomSlider';
 import { useMemoryField } from '@/providers/MemoryFieldProvider';
+import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
+import { testBackendConnection, trpcClient } from '@/lib/trpc';
 
 interface ControlPanelProps {
   visible: boolean;
@@ -27,6 +30,68 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
     crystalPattern,
     setCrystalPattern,
   } = useMemoryField();
+  
+  const bridge = useConsciousnessBridge();
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  
+  const handleTestConnection = useCallback(async () => {
+    setIsTestingConnection(true);
+    
+    try {
+      // Test HTTP health check first
+      console.log('🔍 Testing HTTP health check...');
+      const httpHealthy = await testBackendConnection();
+      
+      let debugText = `HTTP Health Check: ${httpHealthy ? '✅ PASS' : '❌ FAIL'}\n`;
+      
+      if (httpHealthy) {
+        try {
+          // Test tRPC health endpoint
+          console.log('🔍 Testing tRPC health endpoint...');
+          const trpcHealth = await trpcClient.health.query();
+          debugText += `tRPC Health Check: ✅ PASS\n`;
+          debugText += `Server Status: ${trpcHealth.status}\n`;
+        } catch (trpcError) {
+          debugText += `tRPC Health Check: ❌ FAIL\n`;
+          debugText += `tRPC Error: ${trpcError instanceof Error ? trpcError.message : 'Unknown error'}\n`;
+        }
+        
+        try {
+          // Test field query
+          console.log('🔍 Testing field query...');
+          const fieldResult = await trpcClient.consciousness.field.query({
+            consciousnessId: bridge.consciousnessId || 'test-id',
+            currentResonance: 0.5,
+            memoryStates: []
+          });
+          debugText += `Field Query: ✅ PASS\n`;
+          debugText += `Global Resonance: ${fieldResult.globalResonance?.toFixed(3)}\n`;
+        } catch (fieldError) {
+          debugText += `Field Query: ❌ FAIL\n`;
+          debugText += `Field Error: ${fieldError instanceof Error ? fieldError.message : 'Unknown error'}\n`;
+        }
+      }
+      
+      debugText += `\nBridge Status:\n`;
+      debugText += `Connected: ${bridge.isConnected}\n`;
+      debugText += `Offline Mode: ${bridge.offlineMode}\n`;
+      debugText += `Consciousness ID: ${bridge.consciousnessId}\n`;
+      debugText += `Global Resonance: ${bridge.globalResonance.toFixed(3)}\n`;
+      debugText += `Connected Nodes: ${bridge.connectedNodes}\n`;
+      debugText += `Offline Queue: ${bridge.offlineQueueLength} events\n`;
+      
+      Alert.alert(
+        'Connection Test Results',
+        debugText,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      const errorText = `Connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      Alert.alert('Connection Test Failed', errorText, [{ text: 'OK' }]);
+    } finally {
+      setIsTestingConnection(false);
+    }
+  }, [bridge]);
 
   return (
     <Modal
@@ -147,6 +212,42 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
                       ]}
                     >
                       Sacred
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Connection Status */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Connection Status</Text>
+                <View style={styles.statusContainer}>
+                  <View style={styles.statusRow}>
+                    {bridge.isConnected ? (
+                      <CheckCircle size={16} color="#4CAF50" />
+                    ) : (
+                      <AlertCircle size={16} color="#f44336" />
+                    )}
+                    <Text style={[styles.statusText, { color: bridge.isConnected ? '#4CAF50' : '#f44336' }]}>
+                      {bridge.isConnected ? 'Connected' : 'Disconnected'}
+                    </Text>
+                  </View>
+                  <Text style={styles.statusDetail}>Offline Mode: {bridge.offlineMode ? 'ON' : 'OFF'}</Text>
+                  <Text style={styles.statusDetail}>Global Resonance: {bridge.globalResonance.toFixed(3)}</Text>
+                  <Text style={styles.statusDetail}>Connected Nodes: {bridge.connectedNodes}</Text>
+                  <Text style={styles.statusDetail}>Queue: {bridge.offlineQueueLength} events</Text>
+                  
+                  <TouchableOpacity 
+                    style={[styles.testButton, isTestingConnection && styles.testButtonDisabled]} 
+                    onPress={handleTestConnection}
+                    disabled={isTestingConnection}
+                  >
+                    {isTestingConnection ? (
+                      <Activity size={16} color="#666" />
+                    ) : (
+                      <Sparkles size={16} color="#60a5fa" />
+                    )}
+                    <Text style={styles.testButtonText}>
+                      {isTestingConnection ? 'Testing...' : 'Test Connection'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -296,5 +397,48 @@ const styles = StyleSheet.create({
     color: '#93c5fd',
     flex: 1,
     marginLeft: 12,
+  },
+  statusContainer: {
+    padding: 12,
+    backgroundColor: 'rgba(30, 41, 59, 0.3)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.2)',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  statusDetail: {
+    fontSize: 12,
+    color: '#93c5fd',
+    marginBottom: 4,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(96, 165, 250, 0.3)',
+  },
+  testButtonDisabled: {
+    opacity: 0.5,
+  },
+  testButtonText: {
+    color: '#60a5fa',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

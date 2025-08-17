@@ -6,19 +6,19 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
+  // Check for environment variable first
   if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
     console.log('🌐 Using configured API base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  // Default to local development server
+  // For web environment, use current origin
   if (typeof window !== 'undefined') {
-    // Web environment - use current origin
     const baseUrl = window.location.origin;
     console.log('🌐 Using web origin as base URL:', baseUrl);
     return baseUrl;
   } else {
-    // Mobile environment - use localhost with tunnel
+    // Mobile environment - use localhost
     const baseUrl = 'http://localhost:8081';
     console.log('🌐 Using mobile localhost as base URL:', baseUrl);
     return baseUrl;
@@ -86,9 +86,9 @@ export const trpcClient = trpc.createClient({
             body: options?.body ? 'Present' : 'None'
           });
           
-          // Create timeout promise
+          // Create timeout promise with longer timeout for development
           const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Request timeout')), 10000); // Increased timeout
+            setTimeout(() => reject(new Error('Request timeout')), 15000); // 15 second timeout
           });
           
           const fetchPromise = fetch(url, {
@@ -162,7 +162,7 @@ export const trpcClient = trpc.createClient({
           if (error instanceof TypeError && errorMessage.includes('fetch')) {
             throw new Error(`Network error: Cannot connect to backend server at ${getBaseUrl()}\nMake sure the backend is running and accessible`);
           } else if (errorMessage.includes('timeout')) {
-            throw new Error(`Request timeout: Backend server not responding within 10 seconds\nURL: ${url}`);
+            throw new Error(`Request timeout: Backend server not responding within 15 seconds\nURL: ${url}`);
           } else if (errorMessage.includes('ECONNREFUSED')) {
             throw new Error(`Connection refused: Backend server not running at ${getBaseUrl()}`);
           }
