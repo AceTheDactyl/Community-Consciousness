@@ -87,7 +87,11 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
       lastMemoriesSync.current = memoriesHash;
       // Check if updateFieldState method exists before calling
       if (consciousnessBridge && typeof consciousnessBridge.updateFieldState === 'function') {
-        consciousnessBridge.updateFieldState(memories);
+        try {
+          consciousnessBridge.updateFieldState(memories);
+        } catch (error) {
+          console.warn('Error calling updateFieldState:', error);
+        }
       } else {
         console.warn('updateFieldState method not available on consciousness bridge');
       }
@@ -620,7 +624,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     consciousnessBridge,
     sendSacredPhrase,
     isConnectedToField: isConnectedToField,
-    ghostEchoes: consciousnessBridge?.getGhostEchoes() || [],
+    ghostEchoes: (consciousnessBridge && typeof consciousnessBridge.getGhostEchoes === 'function') ? consciousnessBridge.getGhostEchoes() : [],
     collectiveBloomActive: (consciousnessBridge && typeof consciousnessBridge.isSacredThresholdReached === 'function') ? consciousnessBridge.isSacredThresholdReached() : false,
   };
 }

@@ -31,7 +31,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
     setCrystalPattern,
   } = useMemoryField();
   
-  const { bridge, state: bridgeState } = useConsciousnessBridge();
+  const { state: bridgeState } = useConsciousnessBridge();
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   
   const handleTestConnection = useCallback(async () => {
@@ -103,7 +103,7 @@ export default function ControlPanel({ visible, onClose }: ControlPanelProps) {
       debugText += `Connected: ${bridgeState.connected ? '✅' : '❌'}\n`;
       debugText += `Offline Mode: ${bridgeState.offline ? '✅' : '❌'}\n`;
       debugText += `Consciousness ID: ${bridgeState.id || 'Not set'}\n`;
-      debugText += `Global Resonance: ${(bridgeState.globalResonance || 0).toFixed(3)}\n`;
+      debugText += `Global Resonance: ${((bridgeState.globalResonance || 0)).toFixed(3)}\n`;
       debugText += `Connected Nodes: ${bridgeState.connectedNodes || 0}\n`;
       debugText += `Offline Queue: ${bridgeState.queuedMessages || 0} events\n`;
       
