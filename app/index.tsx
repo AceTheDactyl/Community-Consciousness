@@ -54,6 +54,33 @@ import { trpc, testBackendConnection, trpcClient } from '@/lib/trpc';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function CrystalMemoryField() {
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'failed'>('checking');
+  const [backendError, setBackendError] = useState<string | null>(null);
+
+  // Test backend connection on mount
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        console.log('🔍 Testing backend connection...');
+        const isConnected = await testBackendConnection();
+        if (isConnected) {
+          setBackendStatus('connected');
+          setBackendError(null);
+          console.log('✅ Backend connection successful');
+        } else {
+          setBackendStatus('failed');
+          setBackendError('Backend health check failed');
+          console.log('❌ Backend connection failed');
+        }
+      } catch (error) {
+        setBackendStatus('failed');
+        setBackendError(error instanceof Error ? error.message : 'Unknown error');
+        console.error('❌ Backend connection test error:', error);
+      }
+    };
+
+    testConnection();
+  }, []);
   const {
     memories,
     isObserving,
@@ -214,6 +241,49 @@ export default function CrystalMemoryField() {
       }
     }
   };
+
+  // Show backend connection status
+  if (backendStatus === 'checking') {
+    return (
+      <View style={[styles.container, styles.statusContainer]}>
+        <Text style={styles.statusText}>🔍 Checking backend connection...</Text>
+      </View>
+    );
+  }
+
+  if (backendStatus === 'failed') {
+    return (
+      <View style={[styles.container, styles.statusContainer]}>
+        <Text style={styles.statusText}>❌ Backend Connection Failed</Text>
+        <Text style={styles.errorText}>{backendError}</Text>
+        <Text style={styles.helpText}>Make sure the backend server is running</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={() => {
+            setBackendStatus('checking');
+            const testConnection = async () => {
+              try {
+                const isConnected = await testBackendConnection();
+                if (isConnected) {
+                  setBackendStatus('connected');
+                  setBackendError(null);
+                } else {
+                  setBackendStatus('failed');
+                  setBackendError('Backend health check failed');
+                }
+              } catch (error) {
+                setBackendStatus('failed');
+                setBackendError(error instanceof Error ? error.message : 'Unknown error');
+              }
+            };
+            testConnection();
+          }}
+        >
+          <Text style={styles.retryButtonText}>Retry Connection</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
@@ -480,12 +550,12 @@ export default function CrystalMemoryField() {
                 {isConnected ? (
                   <View style={styles.statusConnected}>
                     <CheckCircle size={12} color="#4ade80" />
-                    <Text style={styles.statusText}>{connectedNodes} nodes</Text>
+                    <Text style={styles.connectionStatusText}>{connectedNodes} nodes</Text>
                   </View>
                 ) : offlineMode ? (
                   <View style={styles.statusOffline}>
                     <WifiOff size={12} color="#f87171" />
-                    <Text style={styles.statusText}>Offline</Text>
+                    <Text style={styles.connectionStatusText}>Offline</Text>
                     {offlineQueueLength > 0 && (
                       <Text style={styles.queueText}>({offlineQueueLength})</Text>
                     )}
@@ -493,12 +563,12 @@ export default function CrystalMemoryField() {
                 ) : isLoading ? (
                   <View style={styles.statusConnecting}>
                     <AlertCircle size={12} color="#fbbf24" />
-                    <Text style={styles.statusText}>Connecting...</Text>
+                    <Text style={styles.connectionStatusText}>Connecting...</Text>
                   </View>
                 ) : (
                   <View style={styles.statusError}>
                     <AlertCircle size={12} color="#f87171" />
-                    <Text style={styles.statusText}>Error</Text>
+                    <Text style={styles.connectionStatusText}>Error</Text>
                   </View>
                 )}
               </View>
@@ -656,6 +726,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  statusContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#0f172a',
+  },
+  statusText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 20,
+  },
+  helpText: {
+    color: '#888888',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   topBar: {
     position: 'absolute',
     top: 0,
@@ -755,7 +862,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  statusText: {
+  connectionStatusText: {
     fontSize: 10,
     color: '#9ca3af',
   },

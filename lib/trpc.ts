@@ -6,10 +6,24 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
-  // Check for environment variable first
+  // Debug environment variables
+  console.log('🔍 Environment check:', {
+    EXPO_PUBLIC_RORK_API_BASE_URL: process.env.EXPO_PUBLIC_RORK_API_BASE_URL,
+    NODE_ENV: process.env.NODE_ENV,
+    isWeb: typeof window !== 'undefined',
+    windowOrigin: typeof window !== 'undefined' ? window.location.origin : 'N/A'
+  });
+
+  // Check for environment variable but ignore external URLs in development
   if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    console.log('🌐 Using configured API base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
-    return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+    const envUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+    // Skip external URLs that might not be accessible
+    if (envUrl.includes('rorktest.dev') || envUrl.includes('dev-')) {
+      console.log('🙅 Ignoring external environment URL in development:', envUrl);
+    } else {
+      console.log('🌐 Using configured API base URL:', envUrl);
+      return envUrl;
+    }
   }
 
   // For web environment, use current origin
