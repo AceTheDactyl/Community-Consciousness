@@ -10,11 +10,16 @@ import consciousnessArchaeologyRoute from "./routes/consciousness/archaeology/ro
 export const appRouter = createTRPCRouter({
   // Simple health check endpoint
   health: publicProcedure.query(() => {
+    console.log('🏥 Health check endpoint called');
     return {
       status: 'ok',
       message: 'tRPC server is running',
       timestamp: new Date().toISOString(),
-      version: '1.0.0'
+      version: '1.0.0',
+      routes: {
+        example: 'available',
+        consciousness: 'available'
+      }
     };
   }),
   example: createTRPCRouter({

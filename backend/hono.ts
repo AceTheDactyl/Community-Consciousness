@@ -18,8 +18,13 @@ app.use("*", cors({
 
 // Log all requests for debugging
 app.use("*", async (c, next) => {
+  const start = Date.now();
   console.log(`📡 ${c.req.method} ${c.req.url} from ${c.req.header('origin') || 'unknown'}`);
+  
   await next();
+  
+  const duration = Date.now() - start;
+  console.log(`✅ ${c.req.method} ${c.req.url} completed in ${duration}ms (status: ${c.res.status})`);
 });
 
 // WebSocket upgrade endpoint
@@ -45,8 +50,12 @@ app.use(
     endpoint: "/trpc", // Remove /api prefix since it's already mounted at /api
     router: appRouter,
     createContext,
-    onError: ({ error, path }) => {
-      console.error(`❌ tRPC error on ${path}:`, error);
+    onError: ({ error, path, type, input }) => {
+      console.error(`❌ tRPC error on ${path} (${type}):`, {
+        error: error.message,
+        stack: error.stack,
+        input: input ? JSON.stringify(input).substring(0, 200) : 'none'
+      });
     },
   })
 );
@@ -113,19 +122,32 @@ app.get("/test", (c) => {
 // Add tRPC test endpoint
 app.get("/trpc-test", async (c) => {
   try {
-    // Test if tRPC router is working
+    // Test if tRPC router is working by calling the health endpoint
+    console.log('🧪 Testing tRPC health endpoint...');
+    
     return c.json({
       message: "tRPC endpoint accessible",
       timestamp: new Date().toISOString(),
       routes: {
+        health: "/api/trpc/health",
         example: "/api/trpc/example.hi",
         consciousness: {
           sync: "/api/trpc/consciousness.sync",
-          field: "/api/trpc/consciousness.field"
+          field: "/api/trpc/consciousness.field",
+          realtime: "/api/trpc/consciousness.realtime",
+          entanglement: "/api/trpc/consciousness.entanglement",
+          room64: "/api/trpc/consciousness.room64",
+          archaeology: "/api/trpc/consciousness.archaeology"
         }
+      },
+      instructions: {
+        health_check: "GET /api/trpc/health",
+        example_mutation: "POST /api/trpc/example.hi with body: {name: 'test'}",
+        field_query: "POST /api/trpc/consciousness.field with required input"
       }
     });
   } catch (error) {
+    console.error('❌ tRPC test endpoint error:', error);
     return c.json({
       error: "tRPC test failed",
       message: error instanceof Error ? error.message : 'Unknown error'

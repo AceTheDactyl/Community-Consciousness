@@ -450,28 +450,40 @@ export function useConsciousnessBridge() {
       
       // First try the simple health check endpoint
       try {
+        console.log('🏥 Attempting tRPC health check...');
         const healthResult = await trpcClient.health.query();
         console.log('✅ tRPC health check passed:', healthResult);
         setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
         return true;
-      } catch (_trpcError) {
-        console.log('⚠️ tRPC health check failed, trying HTTP health check...');
+      } catch (trpcError) {
+        const trpcErrorMessage = trpcError instanceof Error ? trpcError.message : String(trpcError);
+        console.log('⚠️ tRPC health check failed:', trpcErrorMessage);
+        console.log('🔄 Trying HTTP health check as fallback...');
         
         // Fallback to HTTP health check
         const isHealthy = await testBackendConnection();
         if (!isHealthy) {
           console.log('❌ Backend health check failed, switching to offline mode');
+          console.log('📝 Troubleshooting tips:');
+          console.log('  1. Check if backend server is running');
+          console.log('  2. Verify the backend URL is correct');
+          console.log('  3. Check network connectivity');
+          console.log('  4. Look for CORS issues in browser console');
           setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
           return false;
         }
         
-        console.log('✅ HTTP health check passed, but tRPC may have issues');
+        console.log('✅ HTTP health check passed, but tRPC may have routing issues');
+        console.log('📝 This suggests the backend is running but tRPC routes may not be properly configured');
         setState(prev => ({ ...prev, isConnected: true, offlineMode: false }));
         return true;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('❌ Connection test failed:', errorMessage);
+      console.error('❌ Connection test failed:', {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       setState(prev => ({ ...prev, offlineMode: true, isConnected: false }));
       return false;
     }

@@ -75,10 +75,15 @@ export const trpcClient = trpc.createClient({
       fetch: async (url, options) => {
         try {
           console.log('🔗 tRPC request to:', url);
+          console.log('📤 Request options:', {
+            method: options?.method || 'GET',
+            headers: options?.headers,
+            body: options?.body ? 'Present' : 'None'
+          });
           
           // Create timeout promise
           const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Request timeout')), 8000); // Reduced timeout
+            setTimeout(() => reject(new Error('Request timeout')), 10000); // Increased timeout
           });
           
           const fetchPromise = fetch(url, {
@@ -93,30 +98,46 @@ export const trpcClient = trpc.createClient({
           
           const response = await Promise.race([fetchPromise, timeoutPromise]);
           
-          console.log('📡 tRPC response:', response.status, response.statusText);
+          console.log('📡 tRPC response:', {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            url: response.url
+          });
           
           if (!response.ok) {
             let errorText = 'Unknown error';
+            let errorData = null;
+            
             try {
-              errorText = await response.text();
-            } catch {
-              // Ignore text parsing errors
+              const contentType = response.headers.get('content-type');
+              if (contentType?.includes('application/json')) {
+                errorData = await response.json();
+                errorText = JSON.stringify(errorData, null, 2);
+              } else {
+                errorText = await response.text();
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse error response:', parseError);
             }
             
             console.error('❌ tRPC HTTP error:', {
               status: response.status,
               statusText: response.statusText,
               url: url,
-              body: errorText.substring(0, 200) // Limit error text length
+              errorData,
+              errorText: errorText.substring(0, 500) // Increased limit
             });
             
             // Provide specific error messages based on status
             if (response.status === 404) {
-              throw new Error('tRPC endpoint not found - check backend routing');
+              throw new Error(`tRPC endpoint not found: ${url}\nCheck if backend server is running and routes are properly configured`);
             } else if (response.status === 500) {
-              throw new Error('Backend server error - check server logs');
+              throw new Error(`Backend server error (500)\nError details: ${errorText.substring(0, 200)}`);
+            } else if (response.status === 405) {
+              throw new Error(`Method not allowed (405): ${options?.method || 'GET'} ${url}`);
             } else if (response.status >= 400 && response.status < 500) {
-              throw new Error(`Client error ${response.status}: ${response.statusText}`);
+              throw new Error(`Client error ${response.status}: ${response.statusText}\nDetails: ${errorText.substring(0, 200)}`);
             } else {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -125,15 +146,19 @@ export const trpcClient = trpc.createClient({
           return response;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('❌ tRPC fetch error:', errorMessage);
+          console.error('❌ tRPC fetch error:', {
+            message: errorMessage,
+            url,
+            stack: error instanceof Error ? error.stack : undefined
+          });
           
           // Provide more helpful error messages
           if (error instanceof TypeError && errorMessage.includes('fetch')) {
-            throw new Error('Network error: Cannot connect to backend server');
+            throw new Error(`Network error: Cannot connect to backend server at ${getBaseUrl()}\nMake sure the backend is running and accessible`);
           } else if (errorMessage.includes('timeout')) {
-            throw new Error('Request timeout: Backend server not responding');
+            throw new Error(`Request timeout: Backend server not responding within 10 seconds\nURL: ${url}`);
           } else if (errorMessage.includes('ECONNREFUSED')) {
-            throw new Error('Connection refused: Backend server not running');
+            throw new Error(`Connection refused: Backend server not running at ${getBaseUrl()}`);
           }
           
           throw error;

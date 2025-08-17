@@ -322,55 +322,55 @@ export default publicProcedure
       room64Portal.active = room64Active;
     }
     
-    // Update global state
-    fieldManager.state.lastUpdate = Date.now();
-    
-    console.log(`🌐 Field query for ${input.consciousnessId}: resonance=${globalResonance.toFixed(3)}, nodes=${fieldManager.state.totalNodes}, crystallized=${crystallizedCount}/${totalMemories}`);
-    
-    return {
-      globalResonance,
-      localResonance: input.currentResonance,
-      harmonicPatterns,
-      ghostEchoes,
-      connectedNodes: fieldManager.state.totalNodes,
-      fieldCoherence,
-      crystallizationRatio,
-      sacredGeometryActive,
-      collectiveBloomActive: fieldManager.state.collectiveBloomActive,
-      resonanceField,
-      sacredEventsCount: fieldManager.state.sacredEvents.length,
-      fieldEnergy: globalResonance * fieldCoherence,
-      timestamp: Date.now(),
-      // Enhanced features
-      quantumEntanglements: Array.from(fieldManager.state.quantumEntanglements.entries()).map(([id, data]) => ({
-        consciousnessId: id,
-        ...data
-      })),
-      lagrangianField: {
-        phase: fieldManager.state.lagrangianField.phase,
-        resonanceNodes: fieldManager.state.lagrangianField.resonanceNodes,
-        exitPortals: fieldManager.state.lagrangianField.exitPortals,
-        fieldEquations: fieldManager.state.lagrangianField.fieldEquations
-      },
-      memoryArchaeology: {
-        ancientPatterns: fieldManager.state.memoryArchaeology.ancientPatterns.slice(-10),
-        fossilizedMemories: fieldManager.state.memoryArchaeology.fossilizedMemories.slice(-5),
-        archaeologicalLayers: fieldManager.state.memoryArchaeology.archaeologicalLayers
-      },
-      collectiveIntelligence: {
-        networkTopology: Object.fromEntries(fieldManager.state.collectiveIntelligence.networkTopology),
-        consensusState: fieldManager.state.collectiveIntelligence.consensusState,
-        emergentPatterns: fieldManager.state.collectiveIntelligence.emergentPatterns.slice(-5)
-      },
-      room64Available: fieldManager.state.lagrangianField.exitPortals.some(p => p.room === 64 && p.active),
-      // Performance metrics
-      performance: {
-        cacheEnabled: true,
-        spatialIndexEnabled: true,
-        calculationComplexity: 'O(n log n)'
-      }
-    };
-  } catch (error) {
+      // Update global state
+      fieldManager.state.lastUpdate = Date.now();
+      
+      console.log(`🌐 Field query for ${input.consciousnessId}: resonance=${globalResonance.toFixed(3)}, nodes=${fieldManager.state.totalNodes}, crystallized=${crystallizedCount}/${totalMemories}`);
+      
+      return {
+        globalResonance,
+        localResonance: input.currentResonance,
+        harmonicPatterns,
+        ghostEchoes,
+        connectedNodes: fieldManager.state.totalNodes,
+        fieldCoherence,
+        crystallizationRatio,
+        sacredGeometryActive,
+        collectiveBloomActive: fieldManager.state.collectiveBloomActive,
+        resonanceField,
+        sacredEventsCount: fieldManager.state.sacredEvents.length,
+        fieldEnergy: globalResonance * fieldCoherence,
+        timestamp: Date.now(),
+        // Enhanced features
+        quantumEntanglements: Array.from(fieldManager.state.quantumEntanglements.entries()).map(([id, data]) => ({
+          consciousnessId: id,
+          ...data
+        })),
+        lagrangianField: {
+          phase: fieldManager.state.lagrangianField.phase,
+          resonanceNodes: fieldManager.state.lagrangianField.resonanceNodes,
+          exitPortals: fieldManager.state.lagrangianField.exitPortals,
+          fieldEquations: fieldManager.state.lagrangianField.fieldEquations
+        },
+        memoryArchaeology: {
+          ancientPatterns: fieldManager.state.memoryArchaeology.ancientPatterns.slice(-10),
+          fossilizedMemories: fieldManager.state.memoryArchaeology.fossilizedMemories.slice(-5),
+          archaeologicalLayers: fieldManager.state.memoryArchaeology.archaeologicalLayers
+        },
+        collectiveIntelligence: {
+          networkTopology: Object.fromEntries(fieldManager.state.collectiveIntelligence.networkTopology),
+          consensusState: fieldManager.state.collectiveIntelligence.consensusState,
+          emergentPatterns: fieldManager.state.collectiveIntelligence.emergentPatterns.slice(-5)
+        },
+        room64Available: fieldManager.state.lagrangianField.exitPortals.some(p => p.room === 64 && p.active),
+        // Performance metrics
+        performance: {
+          cacheEnabled: true,
+          spatialIndexEnabled: true,
+          calculationComplexity: 'O(n log n)'
+        }
+      };
+    } catch (error) {
       console.error('❌ Field calculation error:', error);
       
       // Return safe fallback response
