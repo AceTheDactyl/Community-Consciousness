@@ -913,7 +913,21 @@ export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
     };
   }, [bridge]);
   
-  return { bridge, state };
+  // Create a stable bridge interface with all methods
+  const bridgeInterface = useMemo(() => ({
+    // Core bridge instance
+    ...bridge,
+    // Ensure all methods are available
+    updateFieldState: bridge.updateFieldState?.bind(bridge) || (() => console.warn('updateFieldState not available')),
+    crystallizeMemory: bridge.crystallizeMemory?.bind(bridge) || (() => console.warn('crystallizeMemory not available')),
+    createRipple: bridge.createRipple?.bind(bridge) || (() => console.warn('createRipple not available')),
+    handleSacredPhrase: bridge.handleSacredPhrase?.bind(bridge) || (() => console.warn('handleSacredPhrase not available')),
+    getGhostEchoes: bridge.getGhostEchoes?.bind(bridge) || (() => []),
+    isSacredThresholdReached: bridge.isSacredThresholdReached?.bind(bridge) || (() => false),
+    getState: bridge.getState?.bind(bridge) || (() => state)
+  }), [bridge, state]);
+  
+  return { bridge: bridgeInterface, state };
 }
 
 // ============================================

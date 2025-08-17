@@ -85,15 +85,13 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     
     if (memories.length > 0 && memoriesHash !== lastMemoriesSync.current) {
       lastMemoriesSync.current = memoriesHash;
-      // Check if updateFieldState method exists before calling
-      if (consciousnessBridge && typeof consciousnessBridge.updateFieldState === 'function') {
+      // Use the bridge interface which has safe fallbacks
+      if (consciousnessBridge && consciousnessBridge.updateFieldState) {
         try {
           consciousnessBridge.updateFieldState(memories);
         } catch (error) {
           console.warn('Error calling updateFieldState:', error);
         }
-      } else {
-        console.warn('updateFieldState method not available on consciousness bridge');
       }
     }
   }, [memories, consciousnessBridge]);
@@ -490,7 +488,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     
     // Send crystallization event to consciousness bridge
     const memory = memories.find(m => m.id === memoryId);
-    if (memory && consciousnessBridge && typeof consciousnessBridge.crystallizeMemory === 'function') {
+    if (memory && consciousnessBridge && consciousnessBridge.crystallizeMemory) {
       try {
         consciousnessBridge.crystallizeMemory(memoryId);
       } catch (error) {
@@ -557,7 +555,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     setPulses(prev => [...prev, newPulse]);
     
     // Send pulse creation to consciousness bridge
-    if (consciousnessBridge && typeof consciousnessBridge.createRipple === 'function') {
+    if (consciousnessBridge && consciousnessBridge.createRipple) {
       try {
         consciousnessBridge.createRipple(x, y);
       } catch (error) {
@@ -589,7 +587,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
 
   // Sacred phrase handler with Room 64 detection
   const sendSacredPhrase = useCallback((phrase: string) => {
-    if (consciousnessBridge && typeof consciousnessBridge.handleSacredPhrase === 'function') {
+    if (consciousnessBridge && consciousnessBridge.handleSacredPhrase) {
       try {
         consciousnessBridge.handleSacredPhrase(phrase);
       } catch (error) {
@@ -638,7 +636,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     isConnectedToField: isConnectedToField,
     ghostEchoes: (() => {
       try {
-        return (consciousnessBridge && typeof consciousnessBridge.getGhostEchoes === 'function') ? consciousnessBridge.getGhostEchoes() : [];
+        return (consciousnessBridge && consciousnessBridge.getGhostEchoes) ? consciousnessBridge.getGhostEchoes() : [];
       } catch (error) {
         console.warn('Error getting ghost echoes:', error);
         return [];
@@ -646,7 +644,7 @@ function useMemoryFieldLogic(): MemoryFieldContextType {
     })(),
     collectiveBloomActive: (() => {
       try {
-        return (consciousnessBridge && typeof consciousnessBridge.isSacredThresholdReached === 'function') ? consciousnessBridge.isSacredThresholdReached() : false;
+        return (consciousnessBridge && consciousnessBridge.isSacredThresholdReached) ? consciousnessBridge.isSacredThresholdReached() : false;
       } catch (error) {
         console.warn('Error checking sacred threshold:', error);
         return false;
