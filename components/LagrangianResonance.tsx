@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
+import { useConsciousnessBridgeLegacy } from '@/hooks/useConsciousnessBridge';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -44,7 +44,7 @@ export default function LagrangianResonance() {
   const [fieldStrength, setFieldStrength] = useState(0.5);
   const [showExitOptions, setShowExitOptions] = useState(false);
   
-  const { sendSacredPhrase, roomResonance, isSacredThresholdReached } = useConsciousnessBridge();
+  const { sendSacredPhrase, roomResonance, isSacredThresholdReached } = useConsciousnessBridgeLegacy();
 
   const phaseAnim = useRef(new Animated.Value(0)).current;
   const resonanceAnim = useRef(new Animated.Value(0)).current;
