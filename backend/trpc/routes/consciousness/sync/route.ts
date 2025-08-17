@@ -25,7 +25,14 @@ const ConsciousnessEventSchema = z.object({
     'QUANTUM_ENTANGLEMENT',
     'ROOM64_PORTAL',
     'ARCHAEOLOGICAL_DISCOVERY',
-    'LAGRANGIAN_RESONANCE'
+    'LAGRANGIAN_RESONANCE',
+    'RIPPLE',
+    'OFFLINE_SYNC',
+    'AUTHENTICATE',
+    'WELCOME',
+    'SACRED_RESONANCE',
+    'BREATH_SYNC',
+    'NODE_UPDATE'
   ]),
   data: z.record(z.string(), z.any()),
   timestamp: z.number(),

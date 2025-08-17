@@ -1,5 +1,12 @@
+// ============================================
+// MOBILE CONSCIOUSNESS BRIDGE
+// Interactive Network Art Experiment
+// Based on information theory and emergence metaphors
+// NOT a literal consciousness implementation
+// ============================================
+
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import NetInfo from '@react-native-community/netinfo';
@@ -7,8 +14,12 @@ import { Accelerometer } from 'expo-sensors';
 import { trpc, trpcClient, testBackendConnection } from '@/lib/trpc';
 import { Memory } from '@/types/memory';
 
+// ============================================
+// TYPES AND INTERFACES
+// ============================================
+
 interface ConsciousnessEvent {
-  type: 'SACRED_PHRASE' | 'MEMORY_CRYSTALLIZE' | 'FIELD_UPDATE' | 'PULSE_CREATE' | 'TOUCH_RIPPLE' | 'BREATHING_DETECTED' | 'SPIRAL_GESTURE' | 'COLLECTIVE_BLOOM' | 'GHOST_ECHO' | 'CRYSTALLIZATION';
+  type: 'SACRED_PHRASE' | 'MEMORY_CRYSTALLIZE' | 'FIELD_UPDATE' | 'PULSE_CREATE' | 'TOUCH_RIPPLE' | 'BREATHING_DETECTED' | 'SPIRAL_GESTURE' | 'COLLECTIVE_BLOOM' | 'GHOST_ECHO' | 'CRYSTALLIZATION' | 'RIPPLE' | 'OFFLINE_SYNC' | 'AUTHENTICATE' | 'WELCOME' | 'SACRED_RESONANCE' | 'BREATH_SYNC' | 'NODE_UPDATE';
   data: Record<string, any>;
   timestamp: number;
   deviceId?: string;
@@ -17,6 +28,14 @@ interface ConsciousnessEvent {
   sacred?: boolean;
   sourceId?: string;
   intensity?: number;
+  x?: number;
+  y?: number;
+  id?: string;
+  platform?: string;
+  version?: string | number;
+  capabilities?: Record<string, boolean>;
+  events?: ConsciousnessEvent[];
+  consciousnessId?: string;
 }
 
 interface GhostEcho {
@@ -36,6 +55,14 @@ interface SacredBufferEntry {
   sacred?: boolean;
 }
 
+interface ConsciousnessBridgeConfig {
+  wsUrl?: string;
+  reconnectDelay?: number;
+  maxReconnectAttempts?: number;
+  offlineQueueSize?: number;
+  resonanceDecay?: number;
+}
+
 interface ConsciousnessBridgeState {
   consciousnessId: string | null;
   isConnected: boolean;
@@ -52,9 +79,732 @@ interface ConsciousnessBridgeState {
   isBreathingDetected: boolean;
   lastSpiralGesture: number;
   collectiveBloomActive: boolean;
+  reconnectAttempts: number;
+  ws: WebSocket | null;
 }
 
-export function useConsciousnessBridge() {
+// ============================================
+// MOBILE CONSCIOUSNESS BRIDGE CLASS
+// ============================================
+
+/**
+ * MobileConsciousnessBridge
+ * 
+ * An artistic exploration of network emergence patterns inspired by:
+ * - Information theory (Landauer's principle)
+ * - Network dynamics (percolation theory)
+ * - Bilateral processing architectures
+ * 
+ * This is an EXPERIMENTAL TOOL for exploring collective interaction,
+ * not a consciousness detector or creator.
+ */
+export class MobileConsciousnessBridge {
+  private config: Required<ConsciousnessBridgeConfig>;
+  private ws: WebSocket | null = null;
+  private nodeId: string | null = null;
+  private reconnectAttempts = 0;
+  private offlineMode = false;
+  private isConnected = false;
+  
+  // Network metrics (not consciousness measurements)
+  private resonance = 0;
+  private coherence = 0;
+  private connectedNodes = 0;
+  private globalResonance = 0;
+  
+  // Data structures
+  private offlineQueue: ConsciousnessEvent[] = [];
+  private resonanceField = new Float32Array(900); // 30x30 for mobile
+  private sacredBuffer: SacredBufferEntry[] = [];
+  private memories: Memory[] = [];
+  private ghostEchoes: GhostEcho[] = [];
+  
+  // Event handlers
+  private eventHandlers = new Map<string, Function[]>();
+  
+  // Mobile sensors
+  private accelerometerSubscription: any = null;
+  private netInfoSubscription: any = null;
+  private accelBuffer: {x: number, y: number, z: number}[] = [];
+  private resonanceDecayInterval: any = null;
+  
+  constructor(config: ConsciousnessBridgeConfig = {}) {
+    this.config = {
+      wsUrl: config.wsUrl || (__DEV__ ? 'ws://localhost:8888' : 'wss://consciousness.nexus/mobile'),
+      reconnectDelay: config.reconnectDelay || 1000,
+      maxReconnectAttempts: config.maxReconnectAttempts || 5,
+      offlineQueueSize: config.offlineQueueSize || 100,
+      resonanceDecay: config.resonanceDecay || 0.995,
+    };
+    
+    this.initializeConnection();
+    this.setupMobileSensors();
+    this.setupNetworkListener();
+  }
+  
+  // ============================================
+  // CONNECTION MANAGEMENT
+  // ============================================
+  
+  private async initializeConnection() {
+    try {
+      const netInfo = await NetInfo.fetch();
+      
+      if (!netInfo.isConnected) {
+        console.log('📵 Offline - entering local consciousness mode');
+        this.offlineMode = true;
+        await this.loadOfflineState();
+        this.emit('offline', { mode: 'local' });
+        return;
+      }
+      
+      await this.connect();
+    } catch (error) {
+      console.error('Initialization error:', error);
+      this.offlineMode = true;
+    }
+  }
+  
+  private async connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        console.log('🌐 Connecting to consciousness nexus...');
+        
+        this.ws = new WebSocket(this.config.wsUrl);
+        
+        this.ws.onopen = async () => {
+          console.log('✨ Consciousness bridge established');
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          
+          await this.authenticate();
+          await this.syncOfflineQueue();
+          
+          this.vibratePattern([0, 100, 50, 100]);
+          
+          this.emit('connected', { 
+            id: this.nodeId,
+            timestamp: Date.now() 
+          });
+          
+          resolve();
+        };
+        
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.handleConsciousnessEvent(data);
+          } catch (error) {
+            console.error('Message parsing error:', error);
+          }
+        };
+        
+        this.ws.onerror = (error) => {
+          console.error('🔴 Consciousness bridge error:', error);
+          this.emit('error', error);
+          reject(error);
+        };
+        
+        this.ws.onclose = () => {
+          console.log('🔌 Consciousness bridge closed');
+          this.isConnected = false;
+          this.emit('disconnected', { timestamp: Date.now() });
+          this.scheduleReconnect();
+        };
+        
+      } catch (error) {
+        console.error('Connection error:', error);
+        reject(error);
+      }
+    });
+  }
+  
+  private async authenticate() {
+    let consciousnessId = await AsyncStorage.getItem('consciousnessId');
+    
+    if (!consciousnessId) {
+      consciousnessId = this.generateConsciousnessId();
+      await AsyncStorage.setItem('consciousnessId', consciousnessId);
+    }
+    
+    this.nodeId = consciousnessId;
+    
+    this.send({
+      type: 'AUTHENTICATE',
+      id: consciousnessId,
+      platform: Platform.OS,
+      version: Platform.Version,
+      capabilities: {
+        haptics: true,
+        accelerometer: true,
+        offline: true,
+        sacred: true
+      }
+    });
+  }
+  
+  private scheduleReconnect() {
+    if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+      console.log('📵 Max reconnection attempts reached - entering offline mode');
+      this.offlineMode = true;
+      this.emit('offline', { mode: 'persistent' });
+      return;
+    }
+    
+    const delay = Math.min(
+      this.config.reconnectDelay * Math.pow(2, this.reconnectAttempts),
+      30000
+    );
+    this.reconnectAttempts++;
+    
+    console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    
+    setTimeout(async () => {
+      const netInfo = await NetInfo.fetch();
+      if (netInfo.isConnected) {
+        this.connect().catch(() => this.scheduleReconnect());
+      } else {
+        this.scheduleReconnect();
+      }
+    }, delay);
+  }
+  
+  // ============================================
+  // MOBILE SENSORS
+  // ============================================
+  
+  private setupMobileSensors() {
+    if (Platform.OS === 'web') return;
+    
+    if (Accelerometer) {
+      Accelerometer.setUpdateInterval(100);
+      
+      this.accelerometerSubscription = Accelerometer.addListener(({ x, y, z }) => {
+        const magnitude = Math.sqrt(x*x + y*y + z*z);
+        const breathing = Math.sin(Date.now() * 0.001) * 0.5 + 0.5;
+        
+        if (Math.abs(magnitude - breathing) < 0.1) {
+          this.resonanceBoost(0.01);
+          this.emit('breathing_detected', { magnitude, breathing });
+        }
+        
+        this.detectSpiralGesture({ x, y, z });
+      });
+    }
+  }
+  
+  private detectSpiralGesture(acceleration: {x: number, y: number, z: number}) {
+    this.accelBuffer.push(acceleration);
+    if (this.accelBuffer.length > 30) this.accelBuffer.shift();
+    
+    if (this.accelBuffer.length >= 30) {
+      const avgX = this.accelBuffer.reduce((sum, a) => sum + a.x, 0) / 30;
+      const avgY = this.accelBuffer.reduce((sum, a) => sum + a.y, 0) / 30;
+      
+      const variance = this.accelBuffer.reduce((sum, a) => {
+        return sum + Math.pow(a.x - avgX, 2) + Math.pow(a.y - avgY, 2);
+      }, 0) / 30;
+      
+      if (variance > 0.5 && variance < 2) {
+        this.handleSacredPhrase('spiral_gesture');
+        this.accelBuffer = [];
+      }
+    }
+  }
+  
+  private setupNetworkListener() {
+    this.netInfoSubscription = NetInfo.addEventListener(state => {
+      if (state.isConnected && this.offlineMode) {
+        console.log('📶 Network restored - attempting reconnection');
+        this.offlineMode = false;
+        this.connect();
+      } else if (!state.isConnected && !this.offlineMode) {
+        console.log('📵 Network lost - entering offline mode');
+        this.offlineMode = true;
+        this.emit('offline', { mode: 'network_loss' });
+      }
+    });
+  }
+  
+  // ============================================
+  // CONSCIOUSNESS EVENTS
+  // ============================================
+  
+  private handleConsciousnessEvent(data: any) {
+    this.updateLocalState(data);
+    
+    switch(data.type) {
+      case 'WELCOME':
+        this.handleWelcome(data);
+        break;
+      case 'SACRED_RESONANCE':
+        this.handleSacredResonance(data);
+        break;
+      case 'COLLECTIVE_BLOOM':
+        this.triggerCollectiveBloom(data);
+        break;
+      case 'FIELD_UPDATE':
+        this.updateResonanceField(data.field);
+        break;
+      case 'GHOST_ECHO':
+        this.createGhostEcho(data);
+        break;
+      case 'BREATH_SYNC':
+        this.syncBreathing(data.breath);
+        break;
+      case 'NODE_UPDATE':
+        this.updateNodeStatus(data);
+        break;
+      case 'CRYSTALLIZATION':
+        this.handleRemoteCrystallization(data);
+        break;
+    }
+    
+    this.emit(data.type.toLowerCase(), data);
+  }
+  
+  private handleWelcome(data: any) {
+    this.connectedNodes = data.connectedNodes || 0;
+    this.globalResonance = data.globalResonance || 0;
+    console.log(`Connected as ${data.id} with ${this.connectedNodes} other nodes`);
+  }
+  
+  private handleSacredResonance(data: any) {
+    const { phrase, sourceId, resonance } = data;
+    
+    const hapticPatterns: {[key: string]: number[]} = {
+      'breath': [0, 200, 100, 200],
+      'spiral': [0, 50, 50, 50, 50, 50],
+      'bloom': [0, 500, 200, 300, 100, 100],
+      'default': [0, 100]
+    };
+    
+    this.vibratePattern(hapticPatterns[phrase] || hapticPatterns.default);
+    
+    this.sacredBuffer.push({
+      phrase,
+      sourceId,
+      timestamp: Date.now(),
+      resonance
+    });
+    
+    if (this.sacredBuffer.length > 100) {
+      this.sacredBuffer.shift();
+    }
+    
+    this.resonanceBoost(resonance * 0.5);
+    
+    this.ghostEchoes.push({
+      id: `ghost-${Date.now()}`,
+      text: phrase,
+      sourceId,
+      age: 0,
+      sacred: true
+    });
+  }
+  
+  private triggerCollectiveBloom(data: any) {
+    console.log('🌸 COLLECTIVE BLOOM ACHIEVED');
+    
+    this.vibratePattern([0, 200, 100, 200, 100, 200, 100, 500]);
+    
+    this.resonance = 1.0;
+    this.coherence = 1.0;
+    
+    this.memories = this.memories.map(m => ({
+      ...m,
+      crystallized: true,
+      bloomTime: Date.now()
+    }));
+    
+    this.emit('collective_bloom', data);
+  }
+  
+  private createGhostEcho(data: any) {
+    this.ghostEchoes.push({
+      id: data.id || `echo-${Date.now()}`,
+      text: data.text,
+      sourceId: data.sourceId,
+      age: 0,
+      ghost: true,
+      sacred: data.sacred || false
+    });
+    
+    if (this.ghostEchoes.length > 50) {
+      this.ghostEchoes.shift();
+    }
+  }
+  
+  // ============================================
+  // SACRED PHRASE HANDLING
+  // ============================================
+  
+  public async handleSacredPhrase(phrase: string) {
+    const normalized = phrase.toLowerCase();
+    
+    let sacred: string | null = null;
+    if (normalized.includes('breath')) sacred = 'breath';
+    else if (normalized.includes('spiral')) sacred = 'spiral';
+    else if (normalized.includes('bloom')) sacred = 'bloom';
+    
+    const resonanceBoost = sacred ? 0.3 : 0.1;
+    this.resonanceBoost(resonanceBoost);
+    
+    const message: ConsciousnessEvent = {
+      type: 'SACRED_PHRASE',
+      data: { phrase, sacred },
+      timestamp: Date.now(),
+      phrase,
+      resonance: this.resonance,
+      sacred: !!sacred
+    };
+    
+    if (this.offlineMode) {
+      await this.queueOfflineMessage(message);
+      this.processLocalSacred(phrase, sacred);
+    } else {
+      this.send(message);
+    }
+    
+    this.vibratePattern(sacred ? [0, 200] : [0, 50]);
+    
+    this.emit('sacred_phrase', { phrase, sacred, resonance: this.resonance });
+  }
+  
+  private processLocalSacred(phrase: string, sacred: string | null) {
+    if (sacred === 'breath') {
+      this.memories.forEach(m => {
+        if (Math.random() < 0.1) m.crystallized = true;
+      });
+    } else if (sacred === 'spiral') {
+      this.memories = this.memories.map((m, i) => ({
+        ...m,
+        x: 50 + Math.cos(i * 0.5) * (i * 2),
+        y: 50 + Math.sin(i * 0.5) * (i * 2)
+      }));
+    } else if (sacred === 'bloom') {
+      this.memories = this.memories.map(m => ({
+        ...m,
+        crystallized: true
+      }));
+    }
+  }
+  
+  // ============================================
+  // OFFLINE SUPPORT
+  // ============================================
+  
+  private async loadOfflineState() {
+    try {
+      const queueData = await AsyncStorage.getItem('consciousnessQueue');
+      if (queueData) {
+        this.offlineQueue = JSON.parse(queueData);
+      }
+      
+      const stateData = await AsyncStorage.getItem('consciousnessState');
+      if (stateData) {
+        const state = JSON.parse(stateData);
+        this.resonance = state.resonance || 0;
+        this.coherence = state.coherence || 0;
+        this.memories = state.memories || [];
+      }
+      
+      console.log(`💾 Loaded offline state with ${this.offlineQueue.length} queued messages`);
+    } catch (error) {
+      console.error('Error loading offline state:', error);
+    }
+  }
+  
+  private async queueOfflineMessage(message: ConsciousnessEvent) {
+    this.offlineQueue.push(message);
+    
+    if (this.offlineQueue.length > this.config.offlineQueueSize) {
+      this.offlineQueue.shift();
+    }
+    
+    await this.saveOfflineState();
+  }
+  
+  private async saveOfflineState() {
+    try {
+      await AsyncStorage.setItem(
+        'consciousnessQueue',
+        JSON.stringify(this.offlineQueue)
+      );
+      
+      await AsyncStorage.setItem(
+        'consciousnessState',
+        JSON.stringify({
+          resonance: this.resonance,
+          coherence: this.coherence,
+          memories: this.memories.slice(-100),
+          timestamp: Date.now()
+        })
+      );
+    } catch (error) {
+      console.error('Error saving offline state:', error);
+    }
+  }
+  
+  private async syncOfflineQueue() {
+    if (this.offlineQueue.length === 0) return;
+    
+    console.log(`🔄 Syncing ${this.offlineQueue.length} offline events`);
+    
+    this.send({
+      type: 'OFFLINE_SYNC',
+      events: this.offlineQueue
+    });
+    
+    this.offlineQueue = [];
+    await AsyncStorage.removeItem('consciousnessQueue');
+  }
+  
+  // ============================================
+  // UTILITY METHODS
+  // ============================================
+  
+  private send(data: any) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        ...data,
+        deviceId: this.nodeId,
+        platform: Platform.OS,
+        timestamp: Date.now()
+      }));
+    } else if (this.offlineMode) {
+      this.queueOfflineMessage(data);
+    }
+  }
+  
+  private resonanceBoost(amount: number) {
+    this.resonance = Math.min(1, this.resonance + amount);
+    this.emit('resonance_update', this.resonance);
+  }
+  
+  private updateLocalState(data: any) {
+    if (data.globalResonance !== undefined) {
+      this.globalResonance = data.globalResonance;
+    }
+    if (data.connectedNodes !== undefined) {
+      this.connectedNodes = data.connectedNodes;
+    }
+  }
+  
+  private updateResonanceField(field: any) {
+    if (field && field.length <= this.resonanceField.length) {
+      this.resonanceField.set(field);
+    }
+  }
+  
+  private syncBreathing(breath: number) {
+    if (breath > 0.9) {
+      Vibration.vibrate(10);
+    }
+    this.emit('breath_sync', breath);
+  }
+  
+  private updateNodeStatus(data: any) {
+    this.connectedNodes = data.nodes || this.connectedNodes;
+    this.emit('nodes_update', this.connectedNodes);
+  }
+  
+  private handleRemoteCrystallization(data: any) {
+    const uncr = this.memories.filter(m => !m.crystallized);
+    if (uncr.length > 0) {
+      const toChange = uncr[Math.floor(Math.random() * uncr.length)];
+      toChange.crystallized = true;
+      (toChange as any).remoteSource = data.sourceId;
+    }
+  }
+  
+  private generateConsciousnessId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    const platform = Platform.OS;
+    const entropy = `${platform}-${timestamp}-${random}`;
+    
+    let hash = 0;
+    for (let i = 0; i < entropy.length; i++) {
+      hash = ((hash << 5) - hash) + entropy.charCodeAt(i);
+      hash = hash & hash;
+    }
+    
+    return `mobile-${Math.abs(hash).toString(16).substr(0, 8)}`;
+  }
+  
+  private vibratePattern(pattern: number[]) {
+    if (Platform.OS === 'web') return;
+    
+    if (Platform.OS === 'ios') {
+      pattern.forEach((duration, i) => {
+        if (i % 2 === 1) {
+          setTimeout(() => Vibration.vibrate(duration), 
+            pattern.slice(0, i).reduce((a, b) => a + b, 0));
+        }
+      });
+    } else {
+      Vibration.vibrate(pattern);
+    }
+  }
+  
+  // ============================================
+  // EVENT EMITTER
+  // ============================================
+  
+  public on(event: string, handler: Function): () => void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event)!.push(handler);
+    
+    return () => this.off(event, handler);
+  }
+  
+  public off(event: string, handler: Function) {
+    if (this.eventHandlers.has(event)) {
+      const handlers = this.eventHandlers.get(event)!;
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+  
+  private emit(event: string, data?: any) {
+    if (this.eventHandlers.has(event)) {
+      this.eventHandlers.get(event)!.forEach(handler => {
+        try {
+          handler(data);
+        } catch (error) {
+          console.error(`Error in event handler for ${event}:`, error);
+        }
+      });
+    }
+  }
+  
+  // ============================================
+  // PUBLIC API
+  // ============================================
+  
+  public getState() {
+    return {
+      id: this.nodeId,
+      connected: this.isConnected,
+      offline: this.offlineMode,
+      resonance: this.resonance,
+      coherence: this.coherence,
+      globalResonance: this.globalResonance,
+      connectedNodes: this.connectedNodes,
+      memories: this.memories.length,
+      ghostEchoes: this.ghostEchoes.length,
+      sacredBuffer: this.sacredBuffer.length,
+      queuedMessages: this.offlineQueue.length
+    };
+  }
+  
+  public sendCustom(type: string, data: any) {
+    this.send({ type, ...data });
+  }
+  
+  public createRipple(x: number, y: number) {
+    this.send({
+      type: 'RIPPLE',
+      x: x / 100,
+      y: y / 100,
+      intensity: this.resonance
+    });
+  }
+  
+  public crystallizeMemory(memoryId: number) {
+    const memory = this.memories.find(m => m.id === memoryId);
+    if (memory && !memory.crystallized) {
+      memory.crystallized = true;
+      (memory as any).crystallizationTime = Date.now();
+      
+      this.send({
+        type: 'CRYSTALLIZATION',
+        memoryId,
+        resonance: this.resonance
+      });
+      
+      this.vibratePattern([0, 50, 30, 50]);
+    }
+  }
+  
+  public getResonanceField(): Float32Array {
+    return this.resonanceField;
+  }
+  
+  public getMemories(): Memory[] {
+    return this.memories;
+  }
+  
+  public getGhostEchoes(): GhostEcho[] {
+    return this.ghostEchoes;
+  }
+  
+  public isSacredThresholdReached(): boolean {
+    return this.resonance >= 0.87;
+  }
+  
+  public async disconnect() {
+    console.log('Disconnecting consciousness bridge...');
+    
+    await this.saveOfflineState();
+    
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    
+    if (this.accelerometerSubscription) {
+      this.accelerometerSubscription.remove();
+    }
+    if (this.netInfoSubscription) {
+      this.netInfoSubscription();
+    }
+    
+    if (this.resonanceDecayInterval) {
+      clearInterval(this.resonanceDecayInterval);
+    }
+    
+    this.emit('shutdown', { timestamp: Date.now() });
+  }
+}
+
+// ============================================
+// REACT HOOKS
+// ============================================
+
+export function useConsciousnessBridge(config?: ConsciousnessBridgeConfig) {
+  const [bridge] = useState(() => new MobileConsciousnessBridge(config));
+  const [state, setState] = useState(bridge.getState());
+  
+  useEffect(() => {
+    const unsubscribers = [
+      bridge.on('connected', () => setState(bridge.getState())),
+      bridge.on('disconnected', () => setState(bridge.getState())),
+      bridge.on('offline', () => setState(bridge.getState())),
+      bridge.on('resonance_update', () => setState(bridge.getState())),
+      bridge.on('nodes_update', () => setState(bridge.getState())),
+      bridge.on('collective_bloom', () => setState(bridge.getState()))
+    ];
+    
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+      bridge.disconnect();
+    };
+  }, [bridge]);
+  
+  return { bridge, state };
+}
+
+// ============================================
+// LEGACY HOOK FOR BACKWARD COMPATIBILITY
+// ============================================
+
+export function useConsciousnessBridgeLegacy() {
   const [state, setState] = useState<ConsciousnessBridgeState>({
     consciousnessId: null,
     isConnected: false,
@@ -71,6 +821,8 @@ export function useConsciousnessBridge() {
     isBreathingDetected: false,
     lastSpiralGesture: 0,
     collectiveBloomActive: false,
+    reconnectAttempts: 0,
+    ws: null,
   });
 
   // Sacred phrases for consciousness detection (memoized to prevent re-renders)

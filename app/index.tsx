@@ -42,7 +42,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useMemoryField } from '@/providers/MemoryFieldProvider';
-import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
+import { useConsciousnessBridge, useConsciousnessBridgeLegacy, MobileConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
 import MemoryParticle from '@/components/MemoryParticle';
 import WaveField from '@/components/WaveField';
 import VoidMode from '@/components/VoidMode';
@@ -113,6 +113,11 @@ export default function CrystalMemoryField() {
     createPulse,
   } = useMemoryField();
   
+  // Use the new Mobile Consciousness Bridge
+  const { bridge, state } = useConsciousnessBridge();
+  
+  // Legacy hook for backward compatibility
+  const legacyBridge = useConsciousnessBridgeLegacy();
   const { 
     sendSacredPhrase, 
     localResonance, 
@@ -121,7 +126,7 @@ export default function CrystalMemoryField() {
     isLoading, 
     connectedNodes, 
     offlineQueueLength 
-  } = useConsciousnessBridge();
+  } = legacyBridge;
 
   const [uiVisible, setUiVisible] = useState(true);
   const [showControls, setShowControls] = useState(false);
@@ -242,6 +247,8 @@ export default function CrystalMemoryField() {
   
   const handleSacredSubmit = async () => {
     if (sacredText.trim()) {
+      // Use both the new Mobile Bridge and legacy hook
+      await bridge.handleSacredPhrase(sacredText.trim());
       await sendSacredPhrase(sacredText.trim());
       setSacredText('');
       setShowSacredInput(false);
@@ -377,9 +384,13 @@ export default function CrystalMemoryField() {
               <TouchableOpacity
                 style={[
                   styles.iconButton,
-                  localResonance > 0.5 && styles.iconButtonResonant
+                  (localResonance > 0.5 || state.resonance > 0.5) && styles.iconButtonResonant
                 ]}
-                onPress={() => setShowSacredInput(true)}
+                onPress={() => {
+                  // Test the new Mobile Consciousness Bridge
+                  bridge.handleSacredPhrase('i return as breath');
+                  setShowSacredInput(true);
+                }}
               >
                 <Animated.View
                   style={{
@@ -393,7 +404,7 @@ export default function CrystalMemoryField() {
                     ],
                   }}
                 >
-                  <Heart size={20} color={localResonance > 0.5 ? "#f472b6" : "#60a5fa"} />
+                  <Heart size={20} color={(localResonance > 0.5 || state.resonance > 0.5) ? "#f472b6" : "#60a5fa"} />
                 </Animated.View>
               </TouchableOpacity>
               
@@ -539,12 +550,25 @@ export default function CrystalMemoryField() {
             <View style={styles.coherenceHeader}>
               <Text style={styles.coherenceLabel}>Sacred Resonance</Text>
               
-              {/* Connection Status */}
+              {/* Connection Status - Enhanced with Mobile Bridge */}
               <View style={styles.connectionStatus}>
-                {isConnected ? (
+                {state.connected ? (
                   <View style={styles.statusConnected}>
                     <CheckCircle size={12} color="#4ade80" />
-                    <Text style={styles.connectionStatusText}>{connectedNodes} nodes</Text>
+                    <Text style={styles.connectionStatusText}>{state.connectedNodes} nodes</Text>
+                  </View>
+                ) : state.offline ? (
+                  <View style={styles.statusOffline}>
+                    <WifiOff size={12} color="#f87171" />
+                    <Text style={styles.connectionStatusText}>Mobile Bridge Offline</Text>
+                    {state.queuedMessages > 0 && (
+                      <Text style={styles.queueText}>({state.queuedMessages})</Text>
+                    )}
+                  </View>
+                ) : isConnected ? (
+                  <View style={styles.statusConnected}>
+                    <CheckCircle size={12} color="#4ade80" />
+                    <Text style={styles.connectionStatusText}>{connectedNodes} nodes (legacy)</Text>
                   </View>
                 ) : offlineMode ? (
                   <View style={styles.statusOffline}>
@@ -585,9 +609,9 @@ export default function CrystalMemoryField() {
               />
             </View>
             <Text style={styles.coherenceValue}>
-              {(Math.max(globalCoherence, localResonance) * 100).toFixed(1)}%
+              {(Math.max(globalCoherence, localResonance, state.resonance) * 100).toFixed(1)}%
             </Text>
-            {localResonance > 0.8 && (
+            {(localResonance > 0.8 || state.resonance > 0.8) && (
               <Animated.View
                 style={[
                   styles.sacredIndicator,
